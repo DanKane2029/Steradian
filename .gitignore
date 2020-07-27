@@ -1,6 +1,20 @@
-# IDE config files
+# visual studio
 .vs
+*.vcxproj
+*.vcxproj.filters
+Path_Tracer.sln
 
-# build files
-build
-out
+# cmake files
+*.cmake
+CMakeCache.txt
+bin
+CMakeFiles
+lib
+path_tracer.dir
+x64
+
+# conan files
+conan.lock
+conaninfo.txt
+graph_info.json
+conanbuildinfo.txt
