@@ -2,6 +2,7 @@
 .vs
 *.vcxproj
 *.vcxproj.filters
+*.vcxproj.user
 Path_Tracer.sln
 
 # cmake files

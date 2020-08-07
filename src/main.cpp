@@ -1,7 +1,15 @@
+#include "Window.h"
 #include <iostream>
 
 int main()
 {
-	std::cout << "Hello World!" << std::endl;
-	return 0;
+    const unsigned int width = 500;
+    const unsigned int height = 500;
+    
+    Window window("Path Tracer", width, height);
+
+    while (!window.ShouldClose())
+    {
+        window.Update();
+    }
 }

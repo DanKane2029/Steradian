@@ -5,5 +5,10 @@ project(Path_Tracer)
 include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
 conan_basic_setup()
 
-add_executable(path_tracer "src/main.cpp")
+#Classes
+set(WINDOW "src/Window.h" "src/Window.cpp")
+
+set(SOURCES "src/main.cpp" ${WINDOW})
+
+add_executable(path_tracer ${SOURCES})
 target_link_libraries(path_tracer ${CONAN_LIBS})
