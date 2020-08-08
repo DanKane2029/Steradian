@@ -14,9 +14,6 @@ Window::Window(std::string title, unsigned int width, unsigned int height)
         exit(EXIT_FAILURE);
     }
 
-    m_Data.m_Width = width;
-    m_Data.m_Height = height;
-    
     // create GLFW window and context
     m_Window = glfwCreateWindow(width, height, title.c_str(), NULL, NULL);
     
@@ -30,8 +27,13 @@ Window::Window(std::string title, unsigned int width, unsigned int height)
         exit(EXIT_FAILURE);
     }
 
+    m_Data.m_Width = width;
+    m_Data.m_Height = height;
+
     glfwMakeContextCurrent(m_Window);
     glfwSwapInterval(1);
+
+    glfwGetFramebufferSize(m_Window, (int*)&m_Data.m_FBWidth, (int*)&m_Data.m_FBHeight);
 
     // Set Input Callbacks
     glfwSetWindowCloseCallback(m_Window, [] (GLFWwindow* window) {
@@ -44,6 +46,15 @@ Window::Window(std::string title, unsigned int width, unsigned int height)
 
         data->m_Width = width;
         data->m_Height = height;
+    });
+
+    glfwSetFramebufferSizeCallback(m_Window, [](GLFWwindow* window, int width, int height) {
+        WindowData* data = (WindowData*)glfwGetWindowUserPointer(window);
+
+        data->m_FBWidth = width;
+        data->m_FBHeight = height;
+
+        data->m_PixelBuffer->ResizeBuffer(width, height);
 
         glViewport(0, 0, width, height);
     });
@@ -54,8 +65,28 @@ Window::~Window()
     glfwDestroyWindow(m_Window);
 }
 
+std::pair<unsigned int, unsigned int> Window::GetSize()
+{
+    return std::make_pair(m_Data.m_Width, m_Data.m_Height);
+}
+
+std::pair<unsigned int, unsigned int> Window::GetFrameBufferSize()
+{
+    return std::make_pair(m_Data.m_FBWidth, m_Data.m_FBHeight);
+}
+
+void Window::UpdatePixels(void* pixelData)
+{
+    glDrawPixels(m_Data.m_Width, m_Data.m_Height, GL_RGB, GL_FLOAT, pixelData);
+}
+
 void Window::Update()
 {
     glfwSwapBuffers(m_Window);
     glfwPollEvents();
+}
+
+void Window::SetPixelBuffer(PixelBuffer* pixelBuffer)
+{
+    m_Data.m_PixelBuffer.reset(pixelBuffer);
 }
