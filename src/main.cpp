@@ -12,8 +12,7 @@ int main()
 
     auto fbSize = window.GetFrameBufferSize();
     PixelBuffer pixelBuffer(fbSize.first, fbSize.second);
-
-    window.SetPixelBuffer(&pixelBuffer);
+    window.SetPixelBuffer(std::make_shared<PixelBuffer>(pixelBuffer));
 
     float white[3] = { 1.0f, 1.0f, 1.0f };
     size_t numPixPerCycle = 100;

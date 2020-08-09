@@ -6,6 +6,12 @@ PixelBuffer::PixelBuffer(unsigned int width, unsigned int height)
 	m_Buffer.reset(new float[m_Width * m_Height * 3]);
 }
 
+PixelBuffer::PixelBuffer(const PixelBuffer& pixelBuffer)
+	: m_Width(pixelBuffer.m_Width), m_Height(pixelBuffer.m_Height),
+	  m_Buffer(pixelBuffer.m_Buffer)
+{
+}
+
 PixelBuffer::~PixelBuffer()
 {
 }
@@ -28,5 +34,5 @@ void PixelBuffer::ResizeBuffer(unsigned int width, unsigned int height)
 {
 	m_Width = width;
 	m_Height = height;
-	m_Buffer.reset(new float[m_Width * m_Height * 3]{0});
+	m_Buffer.reset(new float[m_Width * m_Height * 3]);
 }

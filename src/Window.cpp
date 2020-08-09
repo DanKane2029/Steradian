@@ -86,7 +86,7 @@ void Window::Update()
     glfwPollEvents();
 }
 
-void Window::SetPixelBuffer(PixelBuffer* pixelBuffer)
+void Window::SetPixelBuffer(std::shared_ptr<PixelBuffer> pixelBuffer)
 {
-    m_Data.m_PixelBuffer.reset(pixelBuffer);
+    m_Data.m_PixelBuffer = pixelBuffer;
 }

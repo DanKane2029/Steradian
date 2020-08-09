@@ -19,7 +19,7 @@ public:
 	void UpdatePixels(void* pixelData);
 	void Update();
 
-	void SetPixelBuffer(PixelBuffer* pixelBuffer);
+	void SetPixelBuffer(std::shared_ptr<PixelBuffer> pixelBuffer);
 
 private:
 	std::string m_Title;
