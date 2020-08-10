@@ -3,36 +3,38 @@
 PixelBuffer::PixelBuffer(unsigned int width, unsigned int height)
 	: m_Width(width), m_Height(height)
 {
-	m_Buffer.reset(new float[m_Width * m_Height * 3]);
-}
-
-PixelBuffer::PixelBuffer(const PixelBuffer& pixelBuffer)
-	: m_Width(pixelBuffer.m_Width), m_Height(pixelBuffer.m_Height),
-	  m_Buffer(pixelBuffer.m_Buffer)
-{
+	m_Buffer = new float[m_Width * m_Height * 3];
 }
 
 PixelBuffer::~PixelBuffer()
 {
+	delete[] m_Buffer;
 }
 
 void PixelBuffer::SetPixel(unsigned int x, unsigned int y, float pixel[3])
 {
 	unsigned int index = (y * m_Width + x) * 3;
 
-	m_Buffer.get()[index]	  = pixel[0];
-	m_Buffer.get()[index + 1] = pixel[1];
-	m_Buffer.get()[index + 2] = pixel[2];
+	m_Buffer[index]	  = pixel[0];
+	m_Buffer[index + 1] = pixel[1];
+	m_Buffer[index + 2] = pixel[2];
+
+	m_NumSetPixels++;
 }
 
 float* PixelBuffer::GetPixels()
 {
-	return m_Buffer.get();
+	return m_Buffer;
 }
 
 void PixelBuffer::ResizeBuffer(unsigned int width, unsigned int height)
 {
-	m_Width = width;
-	m_Height = height;
-	m_Buffer.reset(new float[m_Width * m_Height * 3]);
+	m_Width = width, m_Height = height;
+	unsigned int size = m_Width * m_Height * 3;
+
+	delete[] m_Buffer;
+	m_Buffer = new float[size];
+	memset(m_Buffer, 0.0f, size);
+
+	m_NumSetPixels = 0;
 }

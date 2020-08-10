@@ -19,7 +19,7 @@ public:
 	void UpdatePixels(void* pixelData);
 	void Update();
 
-	void SetPixelBuffer(std::shared_ptr<PixelBuffer> pixelBuffer);
+	void SetPixelBuffer(PixelBuffer* pixelBuffer);
 
 private:
 	std::string m_Title;
@@ -29,7 +29,7 @@ private:
 		unsigned int m_Width = 0, m_Height = 0;
 		unsigned int m_FBWidth = 0, m_FBHeight = 0;
 		bool m_Closed = false;
-		std::shared_ptr<PixelBuffer> m_PixelBuffer;
+		PixelBuffer* m_PixelBuffer;
 	};
 
 	WindowData m_Data;

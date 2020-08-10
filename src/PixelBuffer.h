@@ -5,7 +5,6 @@ class PixelBuffer
 {
 public:
 	PixelBuffer(unsigned int width, unsigned int height);
-	PixelBuffer(const PixelBuffer& pixelBuffer);
 	~PixelBuffer();
 
 	void SetPixel(unsigned int x, unsigned int y, float pixel[3]);
@@ -15,5 +14,7 @@ public:
 
 private:
 	unsigned int m_Width, m_Height;
-	std::shared_ptr<float> m_Buffer;
+	float* m_Buffer;
+
+	unsigned int m_NumSetPixels = 0;
 };

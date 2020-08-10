@@ -1,4 +1,5 @@
 #include "Window.h"
+#include <iostream>
 
 Window::Window(std::string title, unsigned int width, unsigned int height)
     : m_Title(title)
@@ -77,6 +78,8 @@ std::pair<unsigned int, unsigned int> Window::GetFrameBufferSize()
 
 void Window::UpdatePixels(void* pixelData)
 {
+    glClearColor(0, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
     glDrawPixels(m_Data.m_Width, m_Data.m_Height, GL_RGB, GL_FLOAT, pixelData);
 }
 
@@ -86,7 +89,7 @@ void Window::Update()
     glfwPollEvents();
 }
 
-void Window::SetPixelBuffer(std::shared_ptr<PixelBuffer> pixelBuffer)
+void Window::SetPixelBuffer(PixelBuffer* pixelBuffer)
 {
     m_Data.m_PixelBuffer = pixelBuffer;
 }
