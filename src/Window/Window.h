@@ -16,7 +16,6 @@ public:
 	std::pair<unsigned int, unsigned int> GetSize();
 	std::pair<unsigned int, unsigned int> GetFrameBufferSize();
 
-	void UpdatePixels(void* pixelData);
 	void Update();
 
 	void SetPixelBuffer(PixelBuffer* pixelBuffer);

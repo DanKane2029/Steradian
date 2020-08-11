@@ -1,8 +1,6 @@
 #include "Window.h"
 #include "PixelBuffer.h"
 
-#include <iostream>
-
 int main()
 {
     const unsigned int width = 500;
@@ -33,7 +31,6 @@ int main()
             }
         }
 
-        window.UpdatePixels(pixelBuffer.GetPixels());
         window.Update();
     }
 }

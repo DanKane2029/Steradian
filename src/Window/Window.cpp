@@ -76,15 +76,9 @@ std::pair<unsigned int, unsigned int> Window::GetFrameBufferSize()
     return std::make_pair(m_Data.m_FBWidth, m_Data.m_FBHeight);
 }
 
-void Window::UpdatePixels(void* pixelData)
-{
-    glClearColor(0, 0, 0, 1);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glDrawPixels(m_Data.m_Width, m_Data.m_Height, GL_RGB, GL_FLOAT, pixelData);
-}
-
 void Window::Update()
 {
+    glDrawPixels(m_Data.m_Width, m_Data.m_Height, GL_RGB, GL_FLOAT, m_Data.m_PixelBuffer->GetPixels());
     glfwSwapBuffers(m_Window);
     glfwPollEvents();
 }
