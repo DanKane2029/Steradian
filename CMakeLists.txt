@@ -10,6 +10,7 @@ set(SRC_DIR src)
 set(WINDOW_DIR ${SRC_DIR}/Window)
 set(UTILS_DIR ${SRC_DIR}/Utils)
 set(SCENE_DIR ${SRC_DIR}/Scene)
+set(RAY_TRACER_DIR ${SRC_DIR}/RayTracer)
 
 # Util Classes
 set(VEC3 "${UTILS_DIR}/Vec3.h")
@@ -28,9 +29,16 @@ set(MATERIAL "${SCENE_DIR}/Material.h" "${SCENE_DIR}/Material.cpp")
 set(BVH "${SCENE_DIR}/BVH.h" "${SCENE_DIR}/BVH.cpp")
 set(SCENE_TOOLS ${SCENE} ${SCENE_OBJECT} ${LIGHT} ${MATERIAL} ${BVH})
 
+# Ray Tracer Classes
+set(RAY "${RAY_TRACER_DIR}/Ray.h")
+set(HIT "${RAY_TRACER_DIR}/Hit.h")
+set(CAMERA "${RAY_TRACER_DIR}/Camera.h")
+set(RAY_TRACER "${RAY_TRACER_DIR}/RayTracer.h" "${RAY_TRACER_DIR}/RayTracer.cpp")
+set(RAY_TRACER_TOOLS ${RAY} ${HIT} ${CAMERA} ${RAY_TRACER})
+
 # All Sources
-set(SOURCES "${SRC_DIR}/Main.cpp" ${UTILS} ${WINDOW_TOOLS} ${SCENE_TOOLS})
+set(SOURCES "${SRC_DIR}/Main.cpp" ${UTILS} ${WINDOW_TOOLS} ${SCENE_TOOLS} ${RAY_TRACER_TOOLS})
 
 add_executable(path_tracer ${SOURCES})
-target_include_directories(path_tracer PUBLIC ${UTILS_DIR} ${WINDOW_DIR} ${SCENE_DIR})
+target_include_directories(path_tracer PUBLIC ${UTILS_DIR} ${WINDOW_DIR} ${SCENE_DIR} ${RAY_TRACER_DIR})
 target_link_libraries(path_tracer ${CONAN_LIBS})

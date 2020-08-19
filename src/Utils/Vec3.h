@@ -53,6 +53,12 @@ struct Vec3
 		v[0] *= vec.v[0], v[1] *= vec.v[1], v[2] *= vec.v[2];
 	}
 
+	// SCALE
+	inline Vec3 operator*(float s)
+	{
+		return Vec3(v[0] * s, v[1] * s, v[2] * s);
+	}
+
 	// DIVIDE
 	inline Vec3 operator/(const Vec3& vec)
 	{

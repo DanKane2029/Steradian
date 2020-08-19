@@ -11,15 +11,13 @@ PixelBuffer::~PixelBuffer()
 	delete[] m_Buffer;
 }
 
-void PixelBuffer::SetPixel(unsigned int x, unsigned int y, float pixel[3])
+void PixelBuffer::SetPixel(unsigned int x, unsigned int y, Vec3 pixel)
 {
 	unsigned int index = (y * m_Width + x) * 3;
 
-	m_Buffer[index]	    = pixel[0];
-	m_Buffer[index + 1] = pixel[1];
-	m_Buffer[index + 2] = pixel[2];
-
-	m_NumSetPixels++;
+	m_Buffer[index]	    = pixel.v[0];
+	m_Buffer[index + 1] = pixel.v[1];
+	m_Buffer[index + 2] = pixel.v[2];
 }
 
 float* PixelBuffer::GetPixels()
@@ -34,6 +32,9 @@ void PixelBuffer::ResizeBuffer(unsigned int width, unsigned int height)
 
 	delete[] m_Buffer;
 	m_Buffer = new float[size];
+}
 
-	m_NumSetPixels = 0;
+std::pair<unsigned int, unsigned int> PixelBuffer::GetSize()
+{
+	return std::make_pair(m_Width, m_Height);
 }

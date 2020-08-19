@@ -1,5 +1,10 @@
 #include "Window.h"
 #include "PixelBuffer.h"
+#include "Scene.h"
+#include "RayTracer.h"
+
+#include <iostream>
+#include <cstdlib>
 
 int main()
 {
@@ -12,8 +17,20 @@ int main()
     PixelBuffer pixelBuffer(fbSize.first, fbSize.second);
     window.SetPixelBuffer(&pixelBuffer);
 
+    Scene scene;
+    Triangle tri(
+        { -0.5f, -0.5f, -2.0f }, 
+        {  0.5f, -0.5f, -2.0f }, 
+        {  0.0f,  0.5f, -2.0f }
+    );
+    scene.AddObject(&tri);
+
+    Camera camera({0.1, 0.1, 0}, {0,0,-1.0f});
+    RayTracer rayTracer(&pixelBuffer, &scene, camera, 45.0f, 45.0f);
+
     size_t numPixPerCycle = 100;
-    float white[3] = {1.0f, 1.0f, 1.0f};
+
+    srand(0);
 
     while (!window.ShouldClose())
     {
@@ -24,10 +41,10 @@ int main()
         {
             if (curWidth > 0 && curHeight > 0)
             {
-                unsigned int x = rand() % curWidth;
-                unsigned int y = rand() % curHeight;
-                float p[3] = { 1.0f, 1.0f, 1.0f };
-                pixelBuffer.SetPixel(x, y, p);
+                float x = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+                float y = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+
+                rayTracer.SampleScene(x, y);
             }
         }
 
