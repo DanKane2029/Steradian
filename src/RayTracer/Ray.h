@@ -11,4 +11,9 @@ struct Ray
 		this->dir = dir;
 		this->dir.normalize();
 	}
+
+	Vec3 PosAt(float t)
+	{
+		return org + (dir * t);
+	}
 };

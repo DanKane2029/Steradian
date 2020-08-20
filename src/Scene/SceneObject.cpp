@@ -2,11 +2,14 @@
 
 #define EPSILON 0.0000001f
 
+// SCENE OBJECT
 void SceneObject::SetMaterialName(std::string& name)
 {
     m_MaterialName = name;
 }
 
+
+// TRIANGLE
 Triangle::Triangle(Vec3 p0, Vec3 p1, Vec3 p2)
 {
 	m_Points[0] = p0;
@@ -14,7 +17,7 @@ Triangle::Triangle(Vec3 p0, Vec3 p1, Vec3 p2)
 	m_Points[2] = p2;
 }
 
-Vec3 Triangle::GetNormal()
+Vec3 Triangle::GetNormal(Vec3 position)
 {
 	Vec3 v1 = m_Points[1] - m_Points[0];
 	Vec3 v2 = m_Points[2] - m_Points[0];
@@ -78,8 +81,9 @@ Hit Triangle::RayIntersect(Ray ray)
         
         hit.isHit = true;
         hit.materialName = m_MaterialName;
-        hit.normal = GetNormal();
+        hit.normal = GetNormal(Vec3());
         hit.time = t;
+        hit.position = ray.PosAt(t);
         
         return hit;
     }
@@ -87,3 +91,56 @@ Hit Triangle::RayIntersect(Ray ray)
     return hit;
 }
 
+
+// SPHERE
+Sphere::Sphere(Vec3 center, float radius)
+    : m_Center(center), m_Radius(radius)
+{
+}
+
+Vec3 Sphere::GetNormal(Vec3 position)
+{
+    Vec3 normal(
+        position.v[0] - m_Center.v[0], 
+        position.v[1] - m_Center.v[1], 
+        position.v[2] - m_Center.v[2]
+    );
+    normal.normalize();
+
+    return normal;
+}
+
+Hit Sphere::RayIntersect(Ray ray)
+{
+    Hit hit;
+
+    Vec3 L = m_Center - ray.org;
+
+    float tca = L.Dot(ray.dir);
+    if (tca < 0.0f) return hit;
+
+    float d2 = L.Dot(L) - tca * tca;
+    float radius2 = m_Radius * m_Radius;
+    if (d2 > radius2) return hit;
+
+    float thc = sqrtf(radius2 - d2);
+    
+    float t0 = tca - thc;
+    float t1 = tca + thc;
+
+    if (t0 > t1) std::swap(t0, t1);
+
+    if (t0 < 0.0f)
+    {
+        t0 = t1;
+        if (t0 < 0.0f) return hit; // t0 and t1 are both negative
+    }
+
+    hit.isHit = true;
+    hit.materialName = m_MaterialName;
+    hit.time = t0;
+    hit.position = ray.PosAt(t0);
+    hit.normal = GetNormal(hit.position);
+
+    return hit;
+}

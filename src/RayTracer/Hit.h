@@ -14,7 +14,7 @@ struct Hit
 	Hit()
 	{
 		isHit = false;
-		time = 0.0f;
+		time = INFINITY;
 
 		materialName;
 

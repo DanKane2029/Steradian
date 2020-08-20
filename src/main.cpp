@@ -31,16 +31,22 @@ int main()
         {  1.0f, -1.0f, -2.0f }
     );
 
+    Sphere sp({0, 0, -2.0f}, 0.5f);
+
     Material blue(std::string("Blue"), Vec3(0.1f, 0.3f, 0.8f));
     scene.RegisterMaterial(&blue);
 
     Material green(std::string("Green"), Vec3(0.1f, 0.8f, 0.3f));
     scene.RegisterMaterial(&green);
 
+    Material red(std::string("Red"), Vec3(0.8f, 0.1f, 0.3f));
+    scene.RegisterMaterial(&red);
+
     scene.AddObject(&tri, std::string("Blue"));
     scene.AddObject(&tri2, std::string("Green"));
+    scene.AddObject(&sp, std::string("Red"));
 
-    Camera camera({0, 0, 0}, {0,0,-1.0f});
+    Camera camera({0.5, 0.3, 0.3}, {0,0,-2.0f});
     RayTracer rayTracer(&pixelBuffer, &scene, camera, 45.0f, 45.0f);
 
     size_t numPixPerCycle = 1000;
