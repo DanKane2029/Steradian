@@ -3,6 +3,11 @@
 
 #include <Memory>
 
+struct PixelMetaData
+{
+	unsigned int numRaysShot = 0;
+};
+
 class PixelBuffer
 {
 public:
@@ -17,5 +22,7 @@ public:
 
 private:
 	unsigned int m_Width, m_Height;
+
 	float* m_Buffer;
+	PixelMetaData* m_MetaDataBuffer;
 };

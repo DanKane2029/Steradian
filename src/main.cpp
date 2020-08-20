@@ -43,7 +43,7 @@ int main()
     Camera camera({0, 0, 0}, {0,0,-1.0f});
     RayTracer rayTracer(&pixelBuffer, &scene, camera, 45.0f, 45.0f);
 
-    size_t numPixPerCycle = 500;
+    size_t numPixPerCycle = 1000;
 
     srand(0);
 
