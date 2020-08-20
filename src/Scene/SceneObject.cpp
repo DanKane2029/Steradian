@@ -2,6 +2,11 @@
 
 #define EPSILON 0.0000001f
 
+void SceneObject::SetMaterialName(std::string& name)
+{
+    m_MaterialName = name;
+}
+
 Triangle::Triangle(Vec3 p0, Vec3 p1, Vec3 p2)
 {
 	m_Points[0] = p0;
@@ -17,8 +22,10 @@ Vec3 Triangle::GetNormal()
 	return v2.Cross(v2);
 }
 
-bool Triangle::RayIntersect(Ray ray)
+Hit Triangle::RayIntersect(Ray ray)
 {
+    Hit hit;
+    
     // adapted from Moller-Trumbore intersection algorithm pseudocode on wikipedia
     Vec3 orig = ray.org;
     Vec3 dir = ray.dir;
@@ -39,7 +46,7 @@ bool Triangle::RayIntersect(Ray ray)
     // NOT culling
     if (det > -EPSILON && det < EPSILON)
     {
-        return false;
+        return hit;
     }
     float inv_det = 1.0f / det;
 
@@ -51,7 +58,7 @@ bool Triangle::RayIntersect(Ray ray)
     // the intersection lies outside of the triangle
     if (u < 0.0f || u > 1.0f)
     {
-        return false;
+        return hit;
     }
     // prepare to test v parameter
     Vec3 Q = T.Cross(e1);
@@ -62,14 +69,21 @@ bool Triangle::RayIntersect(Ray ray)
     // the intersection is outside the triangle
     if (v < 0.0 || (u + v) > 1.0f)
     {
-        return false;
+        return hit;
     }
 
     float t = e2.Dot(Q) * inv_det;
 
     if (t > 0.0) {
-        return true;
+        
+        hit.isHit = true;
+        hit.materialName = m_MaterialName;
+        hit.normal = GetNormal();
+        hit.time = t;
+        
+        return hit;
     }
 
-    return false;
+    return hit;
 }
+

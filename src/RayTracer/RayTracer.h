@@ -11,7 +11,7 @@ public:
 	~RayTracer();
 
 	void SampleScene(float x, float y);
-	bool ShootRay(Ray ray);
+	Hit ShootRay(Ray ray);
 
 private:
 	float m_FovX, m_FovY;

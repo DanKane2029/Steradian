@@ -18,17 +18,32 @@ int main()
     window.SetPixelBuffer(&pixelBuffer);
 
     Scene scene;
-    Triangle tri(
-        { -0.5f, -0.5f, -2.0f }, 
-        {  0.5f, -0.5f, -2.0f }, 
-        {  0.0f,  0.5f, -2.0f }
-    );
-    scene.AddObject(&tri);
 
-    Camera camera({0.1, 0.1, 0}, {0,0,-1.0f});
+    Triangle tri(
+        { -1.0f, -1.0f, -2.0f }, 
+        {  1.0f, -1.0f, -2.0f }, 
+        { -1.0f,  1.0f, -2.0f }
+    );
+
+    Triangle tri2(
+        { -1.0f,  1.0f, -2.0f },
+        {  1.0f,  1.0f, -2.0f },
+        {  1.0f, -1.0f, -2.0f }
+    );
+
+    Material blue(std::string("Blue"), Vec3(0.1f, 0.3f, 0.8f));
+    scene.RegisterMaterial(&blue);
+
+    Material green(std::string("Green"), Vec3(0.1f, 0.8f, 0.3f));
+    scene.RegisterMaterial(&green);
+
+    scene.AddObject(&tri, std::string("Blue"));
+    scene.AddObject(&tri2, std::string("Green"));
+
+    Camera camera({0, 0, 0}, {0,0,-1.0f});
     RayTracer rayTracer(&pixelBuffer, &scene, camera, 45.0f, 45.0f);
 
-    size_t numPixPerCycle = 100;
+    size_t numPixPerCycle = 500;
 
     srand(0);
 

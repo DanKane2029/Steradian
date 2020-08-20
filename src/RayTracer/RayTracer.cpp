@@ -30,26 +30,27 @@ void RayTracer::SampleScene(float x, float y)
 	dir.normalize();
 
 	Ray ray(m_Camera.org, dir);
-	bool hit = ShootRay(ray);
+	Hit hit = ShootRay(ray);
 
-	if (hit)
+	if (hit.isHit)
 	{
 		unsigned int ix = floorf((size.first-1) * x);
 		unsigned int iy = floorf((size.second-1) * y);
-		Vec3 color = {1.0f, 1.0f, 1.0f};
-		m_PixelBuffer->SetPixel(ix, iy, color);
+		Material* material = m_Scene->GetMaterial(hit.materialName);
+		m_PixelBuffer->SetPixel(ix, iy, material->color);
 	}
 }
 
-bool RayTracer::ShootRay(Ray ray)
+Hit RayTracer::ShootRay(Ray ray)
 {
 	for (SceneObject* so : m_Scene->GetObjectList())
 	{
-		if (so->RayIntersect(ray))
+		Hit curHit = so->RayIntersect(ray);
+		if (curHit.isHit)
 		{
-			return true;
+			return curHit;
 		}
 	}
 
-	return false;
+	return Hit();
 }
