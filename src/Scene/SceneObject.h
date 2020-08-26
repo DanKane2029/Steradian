@@ -4,6 +4,7 @@
 #include "Hit.h"
 
 #include <string>
+#include <vector>
 
 class SceneObject
 {

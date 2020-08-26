@@ -8,8 +8,8 @@
 
 int main()
 {
-    const unsigned int width = 500;
-    const unsigned int height = 500;
+    const unsigned int width = 300;
+    const unsigned int height = 300;
     
     Window window("Path Tracer", width, height);
 
@@ -19,37 +19,70 @@ int main()
 
     Scene scene;
 
-    Triangle tri(
-        { -1.0f, -1.0f, -2.0f }, 
-        {  1.0f, -1.0f, -2.0f }, 
-        { -1.0f,  1.0f, -2.0f }
-    );
+    Camera camera({ 0.0f, 0.5f, 0.0f }, { 0,0,-1.0f });
 
+    Sphere sphere({0.0f, 0.0f, -1.0f}, 0.3f);
+    Sphere sphere2({ 0.0, 0.5f, -1.0f}, 0.3f);
+
+    Triangle tri1(
+        {-10, 0,  10},
+        { 10, 0,  10},
+        {-10, 0, -10}
+    );
     Triangle tri2(
-        { -1.0f,  1.0f, -2.0f },
-        {  1.0f,  1.0f, -2.0f },
-        {  1.0f, -1.0f, -2.0f }
+        {  10, 0, -10 },
+        { -10, 0, -10 },
+        {  10, 0,  10 }
     );
 
-    Sphere sp({0, 0, -2.0f}, 0.5f);
-
-    Material blue(std::string("Blue"), Vec3(0.1f, 0.3f, 0.8f));
+    Material blue(
+        std::string("Blue"), 
+        Vec3(0.1f, 0.3f, 0.8f),
+        0.75,
+        0.2,
+        0.25,
+        3.0f
+    );
     scene.RegisterMaterial(&blue);
 
-    Material green(std::string("Green"), Vec3(0.1f, 0.8f, 0.3f));
-    scene.RegisterMaterial(&green);
-
-    Material red(std::string("Red"), Vec3(0.8f, 0.1f, 0.3f));
+    Material red(
+        std::string("Red"),
+        Vec3(0.8f, 0.3f, 0.1f),
+        0.75,
+        0.2,
+        0.25,
+        3.0f
+    );
     scene.RegisterMaterial(&red);
 
-    scene.AddObject(&tri, std::string("Blue"));
+    Material green(
+        std::string("Green"),
+        Vec3(0.1f, 0.8f, 0.3f),
+        0.5,
+        0.25,
+        0.25,
+        1.0f
+    );
+    scene.RegisterMaterial(&green);
+
+    scene.AddObject(&sphere, std::string("Blue"));
+    scene.AddObject(&sphere2, std::string("Red"));
+    scene.AddObject(&tri1, std::string("Green"));
     scene.AddObject(&tri2, std::string("Green"));
-    scene.AddObject(&sp, std::string("Red"));
 
-    Camera camera({0.5, 0.3, 0.3}, {0,0,-2.0f});
-    RayTracer rayTracer(&pixelBuffer, &scene, camera, 45.0f, 45.0f);
+    scene.SetAmbientLighting({0.2f, 0.2f, 0.2f});
 
-    size_t numPixPerCycle = 1000;
+    PointLight light(
+        {0.5f, 0.25f, -1.5f},
+        {0.75f, 0.75f, 0.75f},
+        0.5f,
+        0.25f
+    );
+    scene.AddLight(&light);
+
+    RayTracer rayTracer(&pixelBuffer, &scene, camera);
+
+    size_t numPixPerCycle = 500;
 
     srand(0);
 

@@ -11,6 +11,8 @@ struct Hit
 	Vec3 position;
 	Vec3 normal;
 
+	Vec3 color;
+
 	Hit()
 	{
 		isHit = false;

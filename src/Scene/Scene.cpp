@@ -1,5 +1,7 @@
 #include "Scene.h"
 
+#include <iostream>
+
 std::vector<SceneObject*> Scene::GetObjectList()
 {
 	return m_ObjectList;
@@ -28,5 +30,14 @@ void Scene::RegisterMaterial(Material* material)
 
 Material* Scene::GetMaterial(std::string materialName)
 {
-	return m_MaterialStore[materialName];
+	auto it = m_MaterialStore.find(materialName);
+
+	if (it == m_MaterialStore.end())
+	{
+		std::cout << "Material Not Found!" << std::endl;
+		exit(EXIT_FAILURE);
+	} else
+	{
+		return m_MaterialStore[materialName];
+	}
 }

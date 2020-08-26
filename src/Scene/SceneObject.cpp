@@ -21,8 +21,11 @@ Vec3 Triangle::GetNormal(Vec3 position)
 {
 	Vec3 v1 = m_Points[1] - m_Points[0];
 	Vec3 v2 = m_Points[2] - m_Points[0];
+    
+    Vec3 normal = v1.Cross(v2);
+    normal.normalize();
 
-	return v2.Cross(v2);
+	return normal;
 }
 
 Hit Triangle::RayIntersect(Ray ray)

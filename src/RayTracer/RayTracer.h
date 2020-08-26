@@ -7,13 +7,18 @@
 class RayTracer
 {
 public:
-	RayTracer(PixelBuffer* pixelBuffer, Scene* scene, Camera camera, float fovX, float fovY);
+	RayTracer(PixelBuffer* pixelBuffer, Scene* scene, Camera camera);
 	~RayTracer();
 
 	void SampleScene(float x, float y);
 	Hit ShootRay(Ray ray);
+	Vec3 GetHitColor(Hit hit);
+	float ShootShadowRays(Light* light, Vec3 pos);
 
 private:
+	unsigned int m_NumShadowRays = 50;
+	unsigned int m_ReflectionLimit = 100;
+
 	float m_FovX, m_FovY;
 	Camera m_Camera;
 
