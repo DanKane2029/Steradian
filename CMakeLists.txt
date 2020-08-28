@@ -14,6 +14,7 @@ set(RAY_TRACER_DIR ${SRC_DIR}/RayTracer)
 
 # Util Classes
 set(VEC3 "${UTILS_DIR}/Vec3.h")
+set(MODEL_LOADER "${UTILS_DIR}/ModelLoader.h" "${UTILS_DIR}/ModelLoader.cpp")
 set(UTILS ${VEC3})
 
 # Window Classes

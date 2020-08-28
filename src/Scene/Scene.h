@@ -11,7 +11,7 @@
 class Scene
 {
 public:
-	std::vector<SceneObject*> GetObjectList();
+	std::vector<SceneObject*>& GetObjectList();
 	void AddObject(SceneObject* sceneObject, std::string materialName);
 	
 	std::vector<Light*> GetLightList();

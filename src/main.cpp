@@ -2,14 +2,15 @@
 #include "PixelBuffer.h"
 #include "Scene.h"
 #include "RayTracer.h"
+#include "ModelLoader.h"
 
 #include <iostream>
 #include <cstdlib>
 
 int main()
 {
-    const unsigned int width = 300;
-    const unsigned int height = 300;
+    const unsigned int width = 500;
+    const unsigned int height = 500;
     
     Window window("Path Tracer", width, height);
 
@@ -17,58 +18,24 @@ int main()
     PixelBuffer pixelBuffer(fbSize.first, fbSize.second);
     window.SetPixelBuffer(&pixelBuffer);
 
+    
     Scene scene;
+    
+    //std::string modelFilePath = "C:\\Users\\Daniel Kane\\Development\\Projects\\Path_Tracer\\res\\models\\Eagle.obj";
+    std::string modelFilePath = "C:\\Users\\Daniel Kane\\Development\\Projects\\Path_Tracer\\res\\models\\lowpolytree.obj";
+    ModelLoader::LoadModel(modelFilePath, std::string("Red"), scene);
 
-    Camera camera({ 0.0f, 0.5f, 0.0f }, { 0,0,-1.0f });
-
-    Sphere sphere({0.0f, 0.0f, -1.0f}, 0.3f);
-    Sphere sphere2({ 0.0, 0.5f, -1.0f}, 0.3f);
-
-    Triangle tri1(
-        {-10, 0,  10},
-        { 10, 0,  10},
-        {-10, 0, -10}
-    );
-    Triangle tri2(
-        {  10, 0, -10 },
-        { -10, 0, -10 },
-        {  10, 0,  10 }
-    );
-
-    Material blue(
-        std::string("Blue"), 
-        Vec3(0.1f, 0.3f, 0.8f),
-        0.75,
-        0.2,
-        0.25,
-        3.0f
-    );
-    scene.RegisterMaterial(&blue);
+    Camera camera({ 0.0f, 0.0f, -5.0f }, { 0,0,-1.0f });
 
     Material red(
-        std::string("Red"),
-        Vec3(0.8f, 0.3f, 0.1f),
+        std::string("Red"), 
+        Vec3(0.8f, 0.1f, 0.3f),
         0.75,
         0.2,
         0.25,
         3.0f
     );
     scene.RegisterMaterial(&red);
-
-    Material green(
-        std::string("Green"),
-        Vec3(0.1f, 0.8f, 0.3f),
-        0.5,
-        0.25,
-        0.25,
-        1.0f
-    );
-    scene.RegisterMaterial(&green);
-
-    scene.AddObject(&sphere, std::string("Blue"));
-    scene.AddObject(&sphere2, std::string("Red"));
-    scene.AddObject(&tri1, std::string("Green"));
-    scene.AddObject(&tri2, std::string("Green"));
 
     scene.SetAmbientLighting({0.2f, 0.2f, 0.2f});
 
@@ -82,7 +49,7 @@ int main()
 
     RayTracer rayTracer(&pixelBuffer, &scene, camera);
 
-    size_t numPixPerCycle = 500;
+    size_t numPixPerCycle = 10;
 
     srand(0);
 

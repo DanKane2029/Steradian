@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-std::vector<SceneObject*> Scene::GetObjectList()
+std::vector<SceneObject*>& Scene::GetObjectList()
 {
 	return m_ObjectList;
 }
@@ -38,6 +38,6 @@ Material* Scene::GetMaterial(std::string materialName)
 		exit(EXIT_FAILURE);
 	} else
 	{
-		return m_MaterialStore[materialName];
+		return m_MaterialStore.at(materialName);
 	}
 }
