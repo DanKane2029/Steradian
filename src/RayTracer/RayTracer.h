@@ -4,6 +4,8 @@
 #include "Scene.h"
 #include "Hit.h"
 
+#include <mutex>
+
 class RayTracer
 {
 public:
@@ -24,4 +26,5 @@ private:
 
 	Scene* m_Scene;
 	PixelBuffer* m_PixelBuffer;
+	std::mutex m_PixelBufferGuard;
 };

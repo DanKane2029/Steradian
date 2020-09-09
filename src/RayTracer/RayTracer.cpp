@@ -40,7 +40,10 @@ void RayTracer::SampleScene(float x, float y)
 		Vec3 color = GetHitColor(hit);
 		unsigned int ix = (unsigned int) floorf((size.first-1) * x);
 		unsigned int iy = (unsigned int) floorf((size.second-1) * y);
+
+		m_PixelBufferGuard.lock();
 		m_PixelBuffer->SetPixel(ix, iy, color);
+		m_PixelBufferGuard.unlock();
 	}
 }
 

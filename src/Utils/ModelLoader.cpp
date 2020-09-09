@@ -2,6 +2,8 @@
 
 bool ModelLoader::LoadModel(std::string filePath, std::string materialName, Scene& scene)
 {
+    std::cout << "Loading Model..." << std::endl;
+
     std::vector<unsigned int> vertexIndices, uvIndices, normalIndices;
     std::vector<Vec3> tempVertices;
     std::vector<Vec3> tempNormals;
@@ -46,10 +48,12 @@ bool ModelLoader::LoadModel(std::string filePath, std::string materialName, Scen
             f->SetMaterialName(materialName);
         }
 
+        std::cout << "Model loaded sucessfully!" << std::endl;
         return true;
 
     } else
     {
+        std::cout << "Model failed to load!" << std::endl;
         return false;
     }
 }
