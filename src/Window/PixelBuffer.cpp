@@ -2,6 +2,12 @@
 
 #include <iostream>
 
+/**
+ * creates a pixel buffer object of a given width and height
+ * 
+ * \param width - the number of columns in the pixel buffer
+ * \param height - the number of rows in the pixel buffer
+ */
 PixelBuffer::PixelBuffer(unsigned int width, unsigned int height)
 	: m_Width(width), m_Height(height)
 {
@@ -9,12 +15,23 @@ PixelBuffer::PixelBuffer(unsigned int width, unsigned int height)
 	m_MetaDataBuffer = new PixelMetaData[m_Width * m_Height];
 }
 
+/**
+ * deletes the pixel data and meta data
+ */
 PixelBuffer::~PixelBuffer()
 {
 	delete[] m_Buffer;
 	delete[] m_MetaDataBuffer;
 }
 
+/**
+ * sets the color of a single pixel in the buffer
+ * if a pixel is set/colored multiple times the colors are averaged
+ * 
+ * \param x - the width of the pixel to be colored
+ * \param y - the height of the pixel to be colored
+ * \param color - the color as a Vec3 to set the desired pixel
+ */
 void PixelBuffer::SetPixel(unsigned int x, unsigned int y, Vec3 color)
 {
 	unsigned int metaDataIndex = (y * m_Width + x);
@@ -36,11 +53,24 @@ void PixelBuffer::SetPixel(unsigned int x, unsigned int y, Vec3 color)
 	m_MetaDataBuffer[metaDataIndex].numRaysShot++;
 }
 
+/**
+ * returns the array of pixels in the buffer
+ * 
+ * \return - the pointer to the first float value of the buffer
+ */
 float* PixelBuffer::GetPixels()
 {
 	return m_Buffer;
 }
 
+/**
+ * changes the size of the pixel buffer
+ * this function is called whenever the application window is resized
+ * all previously calculated pixel values will be reset
+ * 
+ * \param width - the new pixel buffer width
+ * \param height - the new pixel buffer height
+ */
 void PixelBuffer::ResizeBuffer(unsigned int width, unsigned int height)
 {
 	m_Width = width, m_Height = height;
@@ -53,6 +83,11 @@ void PixelBuffer::ResizeBuffer(unsigned int width, unsigned int height)
 	m_MetaDataBuffer = new PixelMetaData[size];
 }
 
+/**
+ * returns the current pixel buffer width and height as a pair
+ * 
+ * \return - the <width, height> pair
+ */
 std::pair<unsigned int, unsigned int> PixelBuffer::GetSize()
 {
 	return std::make_pair(m_Width, m_Height);

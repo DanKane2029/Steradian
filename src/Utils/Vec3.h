@@ -1,6 +1,9 @@
 #pragma once
 #include <math.h>
 
+/**
+ * vector of size three to describe a position or direction in 3D space
+ */
 struct Vec3
 {
 	float v[3];
@@ -30,7 +33,7 @@ struct Vec3
 	{
 		v[0] += vec.v[0], v[1] += vec.v[1], v[2] += vec.v[2];
 	}
-	
+
 	// SUBTRACT
 	inline Vec3 operator-(const Vec3& vec)
 	{

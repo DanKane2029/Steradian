@@ -1,6 +1,9 @@
 #pragma once
 #include "Vec3.h"
 
+/**
+ * a point and a direction used to simulate a light ray
+ */
 struct Ray
 {
 	Vec3 org, dir;

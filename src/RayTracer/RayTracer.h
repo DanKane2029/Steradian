@@ -6,6 +6,9 @@
 
 #include <mutex>
 
+/**
+ * simulates how light interacts with objects to render an image of scene
+ */
 class RayTracer
 {
 public:

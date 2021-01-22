@@ -3,11 +3,17 @@
 
 #include <Memory>
 
+/**
+ * a metadata object used for statistics and debuging 
+ */
 struct PixelMetaData
 {
 	unsigned int numRaysShot = 0;
 };
 
+/**
+ * a container for the buffer containing the pixel data for the rendered image
+ */
 class PixelBuffer
 {
 public:

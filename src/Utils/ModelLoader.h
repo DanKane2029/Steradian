@@ -1,11 +1,14 @@
 #pragma once
-#include <Scene.h>
+#include "Scene.h"
 
 #include <vector>
 #include <string>
 #include <iostream>
 #include <fstream>
 
+/**
+ * a set of functions used to load .obj files into a scene
+ */
 namespace ModelLoader
 {
 	bool LoadModel(std::string filePath, std::string materialName, Scene& scene);

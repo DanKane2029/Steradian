@@ -2,20 +2,27 @@
 #include "Vec3.h"
 #include "Ray.h"
 #include "Hit.h"
+#include "BoundingBox.h"
 
 #include <string>
 #include <vector>
 
+/**
+ * the base class of all objects in a scene
+ */
 class SceneObject
 {
 public:
 	virtual Vec3 GetNormal(Vec3 position) = 0;
 	virtual Hit RayIntersect(Ray ray) = 0;
+	virtual Vec3 GetCenterPoint() = 0;
+	virtual BoundingBox GetBoundingBox() = 0;
 
 	void SetMaterialName(std::string& name);
 
 protected:
 	std::string m_MaterialName;
+	BoundingBox m_BoundingBox;
 };
 
 class Triangle: public SceneObject
@@ -25,6 +32,8 @@ public:
 
 	Vec3 GetNormal(Vec3 position);
 	Hit RayIntersect(Ray ray);
+	Vec3 GetCenterPoint();
+	BoundingBox GetBoundingBox();
 
 private:
 	Vec3 m_Points[3];
@@ -37,6 +46,8 @@ public:
 
 	Vec3 GetNormal(Vec3 position);
 	Hit RayIntersect(Ray ray);
+	Vec3 GetCenterPoint();
+	BoundingBox GetBoundingBox();
 
 private:
 	Vec3 m_Center;

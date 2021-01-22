@@ -12,99 +12,110 @@
 
 int main()
 {
-    const unsigned int width = 500;
-    const unsigned int height = 500;
-    
-    Window window("Path Tracer", width, height);
+	// initial size of window
+	const unsigned int width = 400;
+	const unsigned int height = 400;
 
-    auto fbSize = window.GetFrameBufferSize();
-    PixelBuffer pixelBuffer(fbSize.first, fbSize.second);
-    window.SetPixelBuffer(&pixelBuffer);
+	Window window("Path Tracer", width, height);
 
-    
-    Scene scene;
-    
-    //std::string modelFilePath = "C:\\Users\\Daniel Kane\\Development\\Projects\\Path_Tracer\\res\\models\\Eagle.obj";
-    //std::string modelFilePath = "C:\\Users\\Daniel Kane\\Development\\Projects\\Path_Tracer\\res\\models\\lowpolytree.obj";
-    //std::string modelFilePath = "C:\\Users\\Daniel Kane\\Development\\Projects\\Path_Tracer\\res\\models\\cone.obj";
-    std::string modelFilePath = "C:\\Users\\Daniel Kane\\Development\\Projects\\Path_Tracer\\res\\models\\cube.obj";
-    ModelLoader::LoadModel(modelFilePath, std::string("Red"), scene);
+	// framebuffer size sometimes different than window size
+	auto fbSize = window.GetFrameBufferSize();
+	PixelBuffer pixelBuffer(fbSize.first, fbSize.second);
+	window.SetPixelBuffer(&pixelBuffer);
 
-    Camera camera({ 0.0f, 0.0f, 2.0f }, { 0,0,-1.0f });
+	// create scene
+	Scene scene;
 
-    Material red(
-        std::string("Red"), 
-        Vec3(0.8f, 0.1f, 0.3f),
-        0.75f,
-        0.2f,
-        0.25f,
-        3.0f
-    );
-    scene.RegisterMaterial(&red);
+	Material red(
+		std::string("Red"),
+		Vec3(0.8f, 0.1f, 0.3f),
+		0.75f,
+		0.2f,
+		0.25f,
+		3.0f
+	);
+	scene.RegisterMaterial(&red);
 
-    scene.SetAmbientLighting({0.2f, 0.2f, 0.2f});
+	//std::string modelFilePath = "C:\\Users\\Daniel Kane\\Development\\Projects\\Path_Tracer\\res\\models\\cube.obj";
+	std::string modelFilePath = "C:\\Users\\Daniel Kane\\Development\\Projects\\Path_Tracer\\res\\models\\lowpolytree.obj";
+	ModelLoader::LoadModel(modelFilePath, std::string("Red"), scene);
 
-    PointLight light(
-        {0.5f, 0.25f, -1.5f},
-        {0.75f, 0.75f, 0.75f},
-        0.5f,
-        0.25f
-    );
-    scene.AddLight(&light);
+	Camera camera({ 0.2f, 0.2f, 2.0f }, { 0.0f , 0.0f, 0.0f });
 
-    RayTracer rayTracer(&pixelBuffer, &scene, camera);
+	scene.SetAmbientLighting({ 0.2f, 0.2f, 0.2f });
 
-    size_t numPixPerCycle = 10;
-    double FPS = 60;
-    double secondsPerFrame = 1.0 / FPS;
+	PointLight light(
+		{ 0.5f, 0.25f, -1.5f },
+		{ 0.75f, 0.75f, 0.75f },
+		0.5f,
+		0.25f
+	);
+	scene.AddLight(&light);
 
-    std::default_random_engine randomGenerator;
-    std::uniform_real_distribution<float> dist(0.0, 1.0);
+	scene.CreateAcceleratedStructure();
+	// end scene
 
-    const unsigned int NUM_THREADS = std::thread::hardware_concurrency();
-    std::vector<std::thread> threads(NUM_THREADS);
-    std::mutex consoleMutex;
+	RayTracer rayTracer(&pixelBuffer, &scene, camera);
 
-    unsigned int totalSampleCount = 0;
-    std::mutex totalSampleCountMutex;
+	// framerate determines how much time is given ray shooting
+	double FPS = 60;
+	double secondsPerFrame = 1.0 / FPS;
 
-    while (!window.ShouldClose())
-    {
-        auto curSize = window.GetFrameBufferSize();
-        unsigned int curWidth = curSize.first;
-        unsigned int curHeight = curSize.second;
-        for (size_t i = 0; i < NUM_THREADS; i++)
-        {
-            if (curWidth > 0 && curHeight > 0)
-            {
-                threads[i] = std::thread([&](){
+	// set up thread safe random number generator [0.0, 1.0)
+	std::default_random_engine randomGenerator;
+	std::uniform_real_distribution<float> dist(0.0, 1.0);
 
-                    float x = dist(randomGenerator);
-                    float y = dist(randomGenerator);
+	// set up thread list for ray shooting
+	const unsigned int NUM_THREADS = std::thread::hardware_concurrency();
+	std::vector<std::thread> threads(NUM_THREADS);
+	std::mutex consoleMutex;
 
-                    double curTime = glfwGetTime();
-                    double endingTime = curTime + secondsPerFrame;
-                    int sampleCount = 0;
+	// ray shooting meta data
+	unsigned int totalSampleCount = 0;
+	std::mutex totalSampleCountMutex;
 
-                    while (curTime < endingTime)
-                    {
-                        rayTracer.SampleScene(x, y);
-                        curTime = glfwGetTime();
-                        sampleCount++;
-                    }
+	// application loop
+	while (!window.ShouldClose())
+	{
+		auto curSize = window.GetFrameBufferSize();
+		unsigned int curWidth = curSize.first;
+		unsigned int curHeight = curSize.second;
 
-                    totalSampleCountMutex.lock();
-                    totalSampleCount += sampleCount;
-                    totalSampleCountMutex.unlock();
-                });
-            }
-        }
+		// initialize threads for ray shooting
+		for (size_t i = 0; i < NUM_THREADS; i++)
+		{
+			if (curWidth > 0 && curHeight > 0)
+			{
+				threads[i] = std::thread([&]() {
 
-        for (std::thread& t : threads)
-        {
-            if (t.joinable()) t.join();
-        }
+					float x = dist(randomGenerator);
+					float y = dist(randomGenerator);
 
-        window.Update();
-    }
+					double curTime = glfwGetTime();
+					double endingTime = curTime + secondsPerFrame;
+					int sampleCount = 0;
+
+					// shoot rays until ready to display next frame
+					while (curTime < endingTime)
+					{
+						rayTracer.SampleScene(x, y);
+						curTime = glfwGetTime();
+						sampleCount++;
+					}
+
+					totalSampleCountMutex.lock();
+					totalSampleCount += sampleCount;
+					totalSampleCountMutex.unlock();
+					});
+			}
+		}
+
+		// wait for all threads to finish
+		for (std::thread& t : threads)
+		{
+			if (t.joinable()) t.join();
+		}
+
+		window.Update();
+	}
 }

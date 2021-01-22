@@ -3,6 +3,9 @@
 
 #include <string>
 
+/**
+ * a set of data that describes the surface of a scene object 
+ */
 struct Material
 {
 	std::string name;

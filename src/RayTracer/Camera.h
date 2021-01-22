@@ -1,6 +1,10 @@
 #pragma once
 #include "Vec3.h"
 
+/**
+ * describes the perspective the rendered image using
+ * the position and direction the camera looks at
+ */
 struct Camera
 {
 	Vec3 org, dir;

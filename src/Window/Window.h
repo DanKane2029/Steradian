@@ -4,6 +4,9 @@
 #include <GLFW/glfw3.h>
 #include <String>
 
+/**
+ * wrapper for the GLFW window used to display the rendered image
+ */
 class Window
 {
 public:
@@ -22,7 +25,7 @@ public:
 
 private:
 	std::string m_Title;
-	
+
 	struct WindowData
 	{
 		unsigned int m_Width = 0, m_Height = 0;
@@ -32,6 +35,6 @@ private:
 	};
 
 	WindowData m_Data;
-	
-	GLFWwindow* m_Window;	
+
+	GLFWwindow* m_Window;
 };

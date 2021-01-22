@@ -1,6 +1,9 @@
 #pragma once
 #include <string>
 
+/**
+ * a set of data that describes a ray-scene object interesction
+ */
 struct Hit
 {
 	bool isHit;

@@ -1,25 +1,31 @@
 #pragma once
 #include "SceneObject.h"
 
+#include "BoundingBox.h"
+
 #include <vector>
+#include <algorithm>
+#include <iterator>
+#include <iostream>
+#include <limits>
 
-struct BoundingBox
-{
-	float min[3], max[3];
-	std::vector<BoundingBox*> children;
-
-	BoundingBox(float minX, float maxX, float minY, float maxY, float minZ, float maxZ)
-	{
-		min[0] = minX; min[1] = minY; min[2] = minZ;
-		max[0] = maxX; max[1] = maxY; max[2] = maxZ;
-	}
-};
-
+/**
+ * bounding volume heirarchy (octree) used as an acceleration structure
+ * to speed up ray-scene intersection tests
+ */
 class BVH
 {
 public:
-	BVH(std::vector<SceneObject*> objectList);
+	BVH(std::vector<SceneObject*>& objectList);
 
 private:
+	void PartitionSpace(std::vector<SceneObject*>& objectList, std::vector<BoundingBox*>& partitionedSpaces);
+	BoundingBox EncapsulateObjects(std::vector<SceneObject*>& objectList);
+
+public:
+	std::vector<BoundingBox> m_BoundingBoxes;
+
+private:
+	std::vector<SceneObject*>& m_OjectList;
 	unsigned int m_ObjectsInLeaf = 10;
 };

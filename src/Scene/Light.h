@@ -1,6 +1,9 @@
 #pragma once
 #include "Vec3.h"
 
+/**
+ * the base class for all lights in the scene
+ */
 class Light
 {
 public:
