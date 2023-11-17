@@ -1,10 +1,10 @@
 #pragma once
-#include "Vec3.h"
+#include "Utils/Vec3.h"
 
-#include <Memory>
+#include <memory>
 
 /**
- * a metadata object used for statistics and debuging 
+ * a metadata object used for statistics and debuging
  */
 struct PixelMetaData
 {
@@ -21,7 +21,7 @@ public:
 	~PixelBuffer();
 
 	void SetPixel(unsigned int x, unsigned int y, Vec3 pixel);
-	float* GetPixels();
+	float *GetPixels();
 
 	void ResizeBuffer(unsigned int width, unsigned int height);
 	std::pair<unsigned int, unsigned int> GetSize();
@@ -29,6 +29,6 @@ public:
 private:
 	unsigned int m_Width, m_Height;
 
-	float* m_Buffer;
-	PixelMetaData* m_MetaDataBuffer;
+	float *m_Buffer;
+	PixelMetaData *m_MetaDataBuffer;
 };

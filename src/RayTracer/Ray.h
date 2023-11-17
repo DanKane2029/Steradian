@@ -1,5 +1,5 @@
 #pragma once
-#include "Vec3.h"
+#include "Utils/Vec3.h"
 
 /**
  * a point and a direction used to simulate a light ray

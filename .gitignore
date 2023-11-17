@@ -3,7 +3,7 @@
 *.vcxproj
 *.vcxproj.filters
 *.vcxproj.user
-Path_Tracer.sln
+*.sln
 
 # cmake files
 *.cmake
@@ -14,8 +14,6 @@ lib
 path_tracer.dir
 x64
 
-# conan files
-conan.lock
-conaninfo.txt
-graph_info.json
-conanbuildinfo.txt
+# Make files
+Makefile
+*.a

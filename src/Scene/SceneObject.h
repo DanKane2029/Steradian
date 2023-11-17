@@ -1,7 +1,7 @@
 #pragma once
-#include "Vec3.h"
-#include "Ray.h"
-#include "Hit.h"
+#include "Utils/Vec3.h"
+#include "RayTracer/Ray.h"
+#include "RayTracer/Hit.h"
 #include "BoundingBox.h"
 
 #include <string>
@@ -18,14 +18,14 @@ public:
 	virtual Vec3 GetCenterPoint() = 0;
 	virtual BoundingBox GetBoundingBox() = 0;
 
-	void SetMaterialName(std::string& name);
+	void SetMaterialName(std::string &name);
 
 protected:
 	std::string m_MaterialName;
 	BoundingBox m_BoundingBox;
 };
 
-class Triangle: public SceneObject
+class Triangle : public SceneObject
 {
 public:
 	Triangle(Vec3 p0, Vec3 p1, Vec3 p2);

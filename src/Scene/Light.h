@@ -1,5 +1,5 @@
 #pragma once
-#include "Vec3.h"
+#include "Utils/Vec3.h"
 
 /**
  * the base class for all lights in the scene

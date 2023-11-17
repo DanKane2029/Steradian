@@ -2,7 +2,7 @@
 #include "PixelBuffer.h"
 
 #include <GLFW/glfw3.h>
-#include <String>
+#include <string>
 
 /**
  * wrapper for the GLFW window used to display the rendered image

@@ -1,7 +1,7 @@
 #pragma once
 #include "Camera.h"
-#include "PixelBuffer.h"
-#include "Scene.h"
+#include "Window/PixelBuffer.h"
+#include "Scene/Scene.h"
 #include "Hit.h"
 
 #include <mutex>
@@ -12,13 +12,13 @@
 class RayTracer
 {
 public:
-	RayTracer(PixelBuffer* pixelBuffer, Scene* scene, Camera camera);
+	RayTracer(PixelBuffer *pixelBuffer, Scene *scene, Camera camera);
 	~RayTracer();
 
 	void SampleScene(float x, float y);
 	Hit ShootRay(Ray ray);
 	Vec3 GetHitColor(Hit hit);
-	float ShootShadowRays(Light* light, Vec3 pos);
+	float ShootShadowRays(Light *light, Vec3 pos);
 
 private:
 	unsigned int m_NumShadowRays = 50;
@@ -27,7 +27,7 @@ private:
 	float m_FovX, m_FovY;
 	Camera m_Camera;
 
-	Scene* m_Scene;
-	PixelBuffer* m_PixelBuffer;
+	Scene *m_Scene;
+	PixelBuffer *m_PixelBuffer;
 	std::mutex m_PixelBufferGuard;
 };

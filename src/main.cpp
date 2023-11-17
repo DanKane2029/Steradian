@@ -1,8 +1,9 @@
-#include "Window.h"
-#include "PixelBuffer.h"
-#include "Scene.h"
-#include "RayTracer.h"
-#include "ModelLoader.h"
+#include "Window/Window.h"
+#include "Window/PixelBuffer.h"
+#include "Scene/Scene.h"
+#include "Scene/SceneObject.h"
+#include "RayTracer/RayTracer.h"
+#include "Utils/ModelLoader.h"
 
 #include <iostream>
 #include <random>
@@ -27,29 +28,30 @@ int main()
 	Scene scene;
 
 	Material red(
-		std::string("Red"),
+		"Red",
 		Vec3(0.8f, 0.1f, 0.3f),
 		0.75f,
 		0.2f,
 		0.25f,
-		3.0f
-	);
+		3.0f);
 	scene.RegisterMaterial(&red);
 
-	//std::string modelFilePath = "C:\\Users\\Daniel Kane\\Development\\Projects\\Path_Tracer\\res\\models\\cube.obj";
-	std::string modelFilePath = "C:\\Users\\Daniel Kane\\Development\\Projects\\Path_Tracer\\res\\models\\lowpolytree.obj";
-	ModelLoader::LoadModel(modelFilePath, std::string("Red"), scene);
+	// std::string modelFilePath = "C:\\Users\\Daniel Kane\\Development\\Projects\\Path_Tracer\\res\\models\\cube.obj";
+	// std::string modelFilePath = "C:\\Users\\Daniel Kane\\Development\\Projects\\Path_Tracer\\res\\models\\lowpolytree.obj";
+	// ModelLoader::LoadModel(modelFilePath, red.name, scene);
 
-	Camera camera({ 0.2f, 0.2f, 2.0f }, { 0.0f , 0.0f, 0.0f });
+	Sphere s(Vec3(0, 0, 0), 1);
+	scene.AddObject(&s, red.name);
 
-	scene.SetAmbientLighting({ 0.2f, 0.2f, 0.2f });
+	Camera camera({0.2f, 0.2f, 2.0f}, {0.0f, 0.0f, 0.0f});
+
+	scene.SetAmbientLighting({0.2f, 0.2f, 0.2f});
 
 	PointLight light(
-		{ 0.5f, 0.25f, -1.5f },
-		{ 0.75f, 0.75f, 0.75f },
+		{0.5f, 0.25f, -1.5f},
+		{0.75f, 0.75f, 0.75f},
 		0.5f,
-		0.25f
-	);
+		0.25f);
 	scene.AddLight(&light);
 
 	scene.CreateAcceleratedStructure();
@@ -86,7 +88,8 @@ int main()
 		{
 			if (curWidth > 0 && curHeight > 0)
 			{
-				threads[i] = std::thread([&]() {
+				threads[i] = std::thread([&]()
+										 {
 
 					float x = dist(randomGenerator);
 					float y = dist(randomGenerator);
@@ -105,15 +108,15 @@ int main()
 
 					totalSampleCountMutex.lock();
 					totalSampleCount += sampleCount;
-					totalSampleCountMutex.unlock();
-					});
+					totalSampleCountMutex.unlock(); });
 			}
 		}
 
 		// wait for all threads to finish
-		for (std::thread& t : threads)
+		for (std::thread &t : threads)
 		{
-			if (t.joinable()) t.join();
+			if (t.joinable())
+				t.join();
 		}
 
 		window.Update();
