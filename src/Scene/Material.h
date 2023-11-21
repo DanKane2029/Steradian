@@ -25,4 +25,15 @@ struct Material
 
 		this->shininess = shininess;
 	}
+
+	Material(std::string name) : name(name)
+	{
+		this->color = Vec3(1, 0.33, 0.2);
+
+		this->ambient = 1.0;
+		this->diffuse = 1.0;
+		this->specular = 1.0;
+
+		this->shininess = 1.0;
+	}
 };

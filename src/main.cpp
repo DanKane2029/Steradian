@@ -3,7 +3,7 @@
 #include "Scene/Scene.h"
 #include "Scene/SceneObject.h"
 #include "RayTracer/RayTracer.h"
-#include "Utils/ModelLoader.h"
+#include "Utils/ObjLoader.h"
 
 #include <iostream>
 #include <random>
@@ -36,21 +36,19 @@ int main()
 		3.0f);
 	scene.RegisterMaterial(&red);
 
-	// std::string modelFilePath = "C:\\Users\\Daniel Kane\\Development\\Projects\\Path_Tracer\\res\\models\\cube.obj";
-	// std::string modelFilePath = "C:\\Users\\Daniel Kane\\Development\\Projects\\Path_Tracer\\res\\models\\lowpolytree.obj";
-	// ModelLoader::LoadModel(modelFilePath, red.name, scene);
+	ObjModel objModel("res/models/lowpolytree.obj");
 
 	Sphere s(Vec3(0, 0, 0), 1);
-	scene.AddObject(&s, red.name);
+	// scene.AddObject(&s, red.name);
 
 	Camera camera({0.2f, 0.2f, 2.0f}, {0.0f, 0.0f, 0.0f});
 
 	scene.SetAmbientLighting({0.2f, 0.2f, 0.2f});
 
 	PointLight light(
-		{0.5f, 0.25f, -1.5f},
+		{0.5f, 0.5f, 1.0f},
 		{0.75f, 0.75f, 0.75f},
-		0.5f,
+		0.8f,
 		0.25f);
 	scene.AddLight(&light);
 
@@ -60,7 +58,7 @@ int main()
 	RayTracer rayTracer(&pixelBuffer, &scene, camera);
 
 	// framerate determines how much time is given ray shooting
-	double FPS = 60;
+	double FPS = 2;
 	double secondsPerFrame = 1.0 / FPS;
 
 	// set up thread safe random number generator [0.0, 1.0)
@@ -88,11 +86,9 @@ int main()
 		{
 			if (curWidth > 0 && curHeight > 0)
 			{
-				threads[i] = std::thread([&]()
-										 {
-
-					float x = dist(randomGenerator);
-					float y = dist(randomGenerator);
+				threads[i] = std::thread(
+					[&]()
+					{
 
 					double curTime = glfwGetTime();
 					double endingTime = curTime + secondsPerFrame;
@@ -101,6 +97,8 @@ int main()
 					// shoot rays until ready to display next frame
 					while (curTime < endingTime)
 					{
+						float x = dist(randomGenerator);
+						float y = dist(randomGenerator);
 						rayTracer.SampleScene(x, y);
 						curTime = glfwGetTime();
 						sampleCount++;
