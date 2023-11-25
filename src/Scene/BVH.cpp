@@ -5,7 +5,7 @@
  * 
  * \param objectList - the list of objects that make up the BVH
  */
-BVH::BVH(std::vector<SceneObject*>& objectList)
+BVH::BVH(std::vector<std::shared_ptr<SceneObject>> objectList)
 	: m_OjectList(objectList)
 {
 	std::cout << "Creating Acceleration Structure..." << std::endl;
@@ -22,10 +22,10 @@ BVH::BVH(std::vector<SceneObject*>& objectList)
  * \param objectList - the vector of scene objects the split
  * \param partitionedSpaces - the list of 
  */
-void BVH::PartitionSpace(std::vector<SceneObject*>& objectList, std::vector<BoundingBox*>& partitionedSpaces)
+void BVH::PartitionSpace(std::vector<std::shared_ptr<SceneObject>> objectList, std::vector<BoundingBox*>& partitionedSpaces)
 {
 	std::vector<Vec3> centerPoints;
-	std::transform(objectList.begin(), objectList.end(), std::back_inserter(centerPoints), [](SceneObject* sceneObject) {
+	std::transform(objectList.begin(), objectList.end(), std::back_inserter(centerPoints), [](std::shared_ptr<SceneObject> sceneObject) {
 		return sceneObject->GetCenterPoint();
 	});
 
@@ -51,7 +51,7 @@ void BVH::PartitionSpace(std::vector<SceneObject*>& objectList, std::vector<Boun
  * \param objectList - the list of scene objects to encapsulate
  * \return - the bounding box encapsulating the scene objects
  */
-BoundingBox BVH::EncapsulateObjects(std::vector<SceneObject*>& objectList)
+BoundingBox BVH::EncapsulateObjects(std::vector<std::shared_ptr<SceneObject>> objectList)
 {
 	constexpr float FLOAT_MIN = std::numeric_limits<float>::min();
 	constexpr float FLOAT_MAX = std::numeric_limits<float>::max();
@@ -60,7 +60,7 @@ BoundingBox BVH::EncapsulateObjects(std::vector<SceneObject*>& objectList)
 	float maxX = FLOAT_MIN, maxY = FLOAT_MIN, maxZ = FLOAT_MIN;
 
 	// Get bounding box of each scene object to find bounding box of all objects
-	for (SceneObject* so : objectList)
+	for (std::shared_ptr<SceneObject> so : objectList)
 	{
 		BoundingBox bb = so->GetBoundingBox();
 

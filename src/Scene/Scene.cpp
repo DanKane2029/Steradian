@@ -7,7 +7,7 @@
  * 
  * \return - the vector of scene object pointers in the scene
  */
-std::vector<SceneObject*>& Scene::GetObjectList()
+std::vector<std::shared_ptr<SceneObject>> Scene::GetObjectList()
 {
 	return m_ObjectList;
 }
@@ -18,10 +18,24 @@ std::vector<SceneObject*>& Scene::GetObjectList()
  * \param sceneObject - the pointer of the scene object to be added
  * \param materialName - the name of the registered material of the added scene object
  */
-void Scene::AddObject(SceneObject* sceneObject, std::string materialName)
+void Scene::AddObject(std::shared_ptr<SceneObject> sceneObject, std::string materialName)
 {
 	sceneObject->SetMaterialName(materialName);
 	m_ObjectList.push_back(sceneObject);
+}
+
+/**
+ * adds multiple scene objects to the scene
+ * 
+ * \param sceneObjectList - a list of scene object to be added
+ * \param materialNmae - the name of the registered material of the added scene objects
+*/
+void Scene::AddObjects(std::vector<std::shared_ptr<SceneObject>> sceneObjectList, std::string materialName)
+{
+	for (std::shared_ptr<SceneObject> sceneObject : sceneObjectList)
+	{
+		AddObject(sceneObject, materialName);
+	}
 }
 
 /**

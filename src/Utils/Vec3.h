@@ -23,6 +23,21 @@ struct Vec3
 		v[0] = 0.0f, v[1] = 0.0f, v[2] = 0.0f;
 	}
 
+	float X()
+	{
+		return v[0];
+	}
+
+	float Y()
+	{
+		return v[1];
+	}
+
+	float Z()
+	{
+		return v[2];
+	}
+
 	// ADD
 	inline Vec3 operator+(const Vec3& vec)
 	{

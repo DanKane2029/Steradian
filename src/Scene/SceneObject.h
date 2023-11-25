@@ -17,6 +17,7 @@ public:
 	virtual Hit RayIntersect(Ray ray) = 0;
 	virtual Vec3 GetCenterPoint() = 0;
 	virtual BoundingBox GetBoundingBox() = 0;
+	
 
 	void SetMaterialName(std::string &name);
 
@@ -30,10 +31,10 @@ class Triangle : public SceneObject
 public:
 	Triangle(Vec3 p0, Vec3 p1, Vec3 p2);
 
-	Vec3 GetNormal(Vec3 position);
-	Hit RayIntersect(Ray ray);
-	Vec3 GetCenterPoint();
-	BoundingBox GetBoundingBox();
+	virtual Vec3 GetNormal(Vec3 position);
+	virtual Hit RayIntersect(Ray ray);
+	virtual Vec3 GetCenterPoint();
+	virtual BoundingBox GetBoundingBox();
 
 private:
 	Vec3 m_Points[3];

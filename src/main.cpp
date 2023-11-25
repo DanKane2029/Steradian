@@ -3,19 +3,20 @@
 #include "Scene/Scene.h"
 #include "Scene/SceneObject.h"
 #include "RayTracer/RayTracer.h"
-#include "Utils/ObjLoader.h"
+#include "Utils/ObjModel.h"
 
 #include <iostream>
 #include <random>
 #include <thread>
 #include <algorithm>
 #include <functional>
+#include <memory>
 
 int main()
 {
 	// initial size of window
-	const unsigned int width = 400;
-	const unsigned int height = 400;
+	const unsigned int width = 800;
+	const unsigned int height = 800;
 
 	Window window("Path Tracer", width, height);
 
@@ -33,13 +34,16 @@ int main()
 		0.75f,
 		0.2f,
 		0.25f,
-		3.0f);
+		3.0f
+	);
 	scene.RegisterMaterial(&red);
 
 	ObjModel objModel("res/models/lowpolytree.obj");
+	std::vector<std::shared_ptr<SceneObject>> modelObjects = objModel.getSceneObjects();
+	scene.AddObjects(modelObjects, "Red");
 
-	Sphere s(Vec3(0, 0, 0), 1);
-	// scene.AddObject(&s, red.name);
+	// Sphere s(Vec3(0, 0, 0), 1);
+	// scene.AddObject(std::make_shared<Sphere>(s), "Red");
 
 	Camera camera({0.2f, 0.2f, 2.0f}, {0.0f, 0.0f, 0.0f});
 
@@ -49,7 +53,8 @@ int main()
 		{0.5f, 0.5f, 1.0f},
 		{0.75f, 0.75f, 0.75f},
 		0.8f,
-		0.25f);
+		0.25f
+	);
 	scene.AddLight(&light);
 
 	scene.CreateAcceleratedStructure();
@@ -58,7 +63,7 @@ int main()
 	RayTracer rayTracer(&pixelBuffer, &scene, camera);
 
 	// framerate determines how much time is given ray shooting
-	double FPS = 2;
+	double FPS = 30;
 	double secondsPerFrame = 1.0 / FPS;
 
 	// set up thread safe random number generator [0.0, 1.0)
@@ -87,26 +92,26 @@ int main()
 			if (curWidth > 0 && curHeight > 0)
 			{
 				threads[i] = std::thread(
-					[&]()
-					{
+					[&]() {
+						double curTime = glfwGetTime();
+						double endingTime = curTime + secondsPerFrame;
+						int sampleCount = 0;
 
-					double curTime = glfwGetTime();
-					double endingTime = curTime + secondsPerFrame;
-					int sampleCount = 0;
+						// shoot rays until ready to display next frame
+						while (curTime < endingTime)
+						{
+							float x = dist(randomGenerator);
+							float y = dist(randomGenerator);
+							rayTracer.SampleScene(x, y);
+							curTime = glfwGetTime();
+							sampleCount++;
+						}
 
-					// shoot rays until ready to display next frame
-					while (curTime < endingTime)
-					{
-						float x = dist(randomGenerator);
-						float y = dist(randomGenerator);
-						rayTracer.SampleScene(x, y);
-						curTime = glfwGetTime();
-						sampleCount++;
+						totalSampleCountMutex.lock();
+						totalSampleCount += sampleCount;
+						totalSampleCountMutex.unlock();
 					}
-
-					totalSampleCountMutex.lock();
-					totalSampleCount += sampleCount;
-					totalSampleCountMutex.unlock(); });
+				);
 			}
 		}
 

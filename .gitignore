@@ -5,6 +5,9 @@
 *.vcxproj.user
 *.sln
 
+# visual studio code
+.vscode
+
 # cmake files
 *.cmake
 CMakeCache.txt
@@ -13,7 +16,9 @@ CMakeFiles
 lib
 path_tracer.dir
 x64
+CMakeDoxyfile.in
 
 # Make files
 Makefile
 *.a
+path_tracer

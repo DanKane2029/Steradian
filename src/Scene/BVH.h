@@ -8,6 +8,7 @@
 #include <iterator>
 #include <iostream>
 #include <limits>
+#include <memory>
 
 /**
  * bounding volume heirarchy (octree) used as an acceleration structure
@@ -16,16 +17,16 @@
 class BVH
 {
 public:
-	BVH(std::vector<SceneObject*>& objectList);
+	BVH(std::vector<std::shared_ptr<SceneObject>> objectList);
 
 private:
-	void PartitionSpace(std::vector<SceneObject*>& objectList, std::vector<BoundingBox*>& partitionedSpaces);
-	BoundingBox EncapsulateObjects(std::vector<SceneObject*>& objectList);
+	void PartitionSpace(std::vector<std::shared_ptr<SceneObject>> objectList, std::vector<BoundingBox*>& partitionedSpaces);
+	BoundingBox EncapsulateObjects(std::vector<std::shared_ptr<SceneObject>> objectList);
 
 public:
 	std::vector<BoundingBox> m_BoundingBoxes;
 
 private:
-	std::vector<SceneObject*>& m_OjectList;
+	std::vector<std::shared_ptr<SceneObject>> m_OjectList;
 	unsigned int m_ObjectsInLeaf = 10;
 };

@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <memory>
 
 /**
  * a collection of primitive scene objects, lights, and materials 
@@ -15,8 +16,9 @@
 class Scene
 {
 public:
-	std::vector<SceneObject*>& GetObjectList();
-	void AddObject(SceneObject* sceneObject, std::string materialName);
+	std::vector<std::shared_ptr<SceneObject>> GetObjectList();
+	void AddObject(std::shared_ptr<SceneObject> sceneObject, std::string materialName);
+	void AddObjects(std::vector<std::shared_ptr<SceneObject>> sceneObjectList, std::string materialName);
 	
 	std::vector<Light*> GetLightList();
 	void AddLight(Light* light);
@@ -32,7 +34,7 @@ public:
 private:
 	Vec3 m_AmbientLighting;
 
-	std::vector<SceneObject*> m_ObjectList;
+	std::vector<std::shared_ptr<SceneObject>> m_ObjectList;
 	std::vector<Light*> m_LightList;
 	std::unordered_map<std::string, Material*> m_MaterialStore;
 	BVH* m_AcceleratedStructure;

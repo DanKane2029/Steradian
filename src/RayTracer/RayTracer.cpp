@@ -65,6 +65,7 @@ void RayTracer::SampleScene(float x, float y)
 	if (hit.isHit)
 	{
 		Vec3 color = GetHitColor(hit);
+
 		unsigned int ix = (unsigned int) floorf((size.first-1) * x);
 		unsigned int iy = (unsigned int) floorf((size.second-1) * y);
 
@@ -86,7 +87,7 @@ Hit RayTracer::ShootRay(Ray ray)
 {
 	Hit hit;
 
-	for (SceneObject* so : m_Scene->GetObjectList())
+	for (std::shared_ptr<SceneObject> so : m_Scene->GetObjectList())
 	{
 		Hit curHit = so->RayIntersect(ray);
 		if (curHit.isHit && curHit.time < hit.time)
