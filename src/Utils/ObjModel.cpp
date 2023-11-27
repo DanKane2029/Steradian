@@ -19,7 +19,7 @@ bool ObjModel::loadModel(std::string filePath)
 	std::vector<unsigned int> vertexIndices, uvIndices, normalIndices;
 	std::vector<SceneObject> objList;
 
-	std::ifstream objFile(filePath.c_str());
+	std::ifstream objFile(filePath.c_str(), std::ios::in);
 
 	if (objFile)
 	{
@@ -170,17 +170,63 @@ std::vector<ObjModel::FaceIndices> ObjModel::parseFace(std::vector<std::string> 
 	return faces;
 }
 
-std::vector<std::shared_ptr<SceneObject>> ObjModel::getSceneObjects() {
+std::vector<std::shared_ptr<SceneObject>> ObjModel::getSceneObjects()
+{
 	std::vector<std::shared_ptr<SceneObject>> sceneObjectList;
 
-	for (std::vector<ObjModel::FaceIndices> faceIndices : faceIndicesList) {
-		FaceIndices fi0 = faceIndices[0];
-		FaceIndices fi1 = faceIndices[1];
-		FaceIndices fi2 = faceIndices[2];
+	for (std::vector<ObjModel::FaceIndices> faceIndices : faceIndicesList)
+	{
+		if (faceIndices.size() > 3)
+		{
+			std::vector<Triangle> triList = triangulateFace(faceIndices);
+			for (Triangle tri : triList)
+			{
+				sceneObjectList.push_back(std::make_shared<Triangle>(tri));
+			}
+		}
+		else
+		{
+			FaceIndices fi0 = faceIndices[0];
+			FaceIndices fi1 = faceIndices[1];
+			FaceIndices fi2 = faceIndices[2];
 
-		Triangle tri = Triangle(fi0.position, fi1.position, fi2.position);
-		sceneObjectList.push_back(std::make_shared<Triangle>(tri));
+			Triangle tri = Triangle(
+				vertexList[fi0.position - 1],
+				vertexList[fi1.position - 1],
+				vertexList[fi2.position - 1]);
+
+			sceneObjectList.push_back(std::make_shared<Triangle>(tri));
+		}
 	}
 
 	return sceneObjectList;
+}
+
+std::vector<Triangle> ObjModel::triangulateFace(std::vector<ObjModel::FaceIndices> faceIndices)
+{
+	FaceIndices start = faceIndices[0];
+	std::vector<Triangle> triList;
+
+	for (unsigned int i = 1; i < faceIndices.size() - 1; i++)
+	{
+		triList.push_back(
+			Triangle(
+				vertexList[start.position - 1],
+				vertexList[faceIndices[i].position - 1],
+				vertexList[faceIndices[i + 1].position - 1]));
+	}
+
+	return triList;
+}
+
+Vec3 ObjModel::getCenterPoint()
+{
+	Vec3 sum = Vec3();
+	for (Vec3 v : vertexList)
+	{
+		sum = sum + v;
+	}
+
+	Vec3 center = sum / vertexList.size();
+	return center;
 }

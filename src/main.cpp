@@ -30,22 +30,21 @@ int main()
 
 	Material red(
 		"Red",
-		Vec3(0.8f, 0.1f, 0.3f),
+		Vec3(0.8f, 0.9f, 0.3f),
 		0.75f,
 		0.2f,
 		0.25f,
-		3.0f
-	);
+		3.0f);
 	scene.RegisterMaterial(&red);
 
-	ObjModel objModel("res/models/lowpolytree.obj");
+	ObjModel objModel("/mnt/c/Users/dpk20/Dev/Path_Tracer/res/models/cone.obj");
+	// ObjModel objModel("/mnt/c/Users/dpk20/Dev/Path_Tracer/res/models/Eagle.obj");
 	std::vector<std::shared_ptr<SceneObject>> modelObjects = objModel.getSceneObjects();
 	scene.AddObjects(modelObjects, "Red");
 
-	// Sphere s(Vec3(0, 0, 0), 1);
-	// scene.AddObject(std::make_shared<Sphere>(s), "Red");
-
-	Camera camera({0.2f, 0.2f, 2.0f}, {0.0f, 0.0f, 0.0f});
+	Camera camera(
+		{0.0f, 0.0f, 100.0f},
+		objModel.getCenterPoint());
 
 	scene.SetAmbientLighting({0.2f, 0.2f, 0.2f});
 
@@ -53,8 +52,7 @@ int main()
 		{0.5f, 0.5f, 1.0f},
 		{0.75f, 0.75f, 0.75f},
 		0.8f,
-		0.25f
-	);
+		0.25f);
 	scene.AddLight(&light);
 
 	scene.CreateAcceleratedStructure();
@@ -92,10 +90,10 @@ int main()
 			if (curWidth > 0 && curHeight > 0)
 			{
 				threads[i] = std::thread(
-					[&]() {
+					[&]()
+					{
 						double curTime = glfwGetTime();
 						double endingTime = curTime + secondsPerFrame;
-						int sampleCount = 0;
 
 						// shoot rays until ready to display next frame
 						while (curTime < endingTime)
@@ -104,14 +102,8 @@ int main()
 							float y = dist(randomGenerator);
 							rayTracer.SampleScene(x, y);
 							curTime = glfwGetTime();
-							sampleCount++;
 						}
-
-						totalSampleCountMutex.lock();
-						totalSampleCount += sampleCount;
-						totalSampleCountMutex.unlock();
-					}
-				);
+					});
 			}
 		}
 
@@ -119,9 +111,14 @@ int main()
 		for (std::thread &t : threads)
 		{
 			if (t.joinable())
+			{
 				t.join();
+			}
 		}
 
 		window.Update();
 	}
+
+	glfwTerminate();
+	exit(EXIT_SUCCESS);
 }

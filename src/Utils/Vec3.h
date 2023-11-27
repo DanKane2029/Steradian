@@ -1,5 +1,6 @@
 #pragma once
 #include <math.h>
+#include <iostream>
 
 /**
  * vector of size three to describe a position or direction in 3D space
@@ -23,50 +24,50 @@ struct Vec3
 		v[0] = 0.0f, v[1] = 0.0f, v[2] = 0.0f;
 	}
 
-	float X()
+	float X() const
 	{
 		return v[0];
 	}
 
-	float Y()
+	float Y() const
 	{
 		return v[1];
 	}
 
-	float Z()
+	float Z() const
 	{
 		return v[2];
 	}
 
 	// ADD
-	inline Vec3 operator+(const Vec3& vec)
+	inline Vec3 operator+(const Vec3 &vec)
 	{
 		return Vec3(v[0] + vec.v[0], v[1] + vec.v[1], v[2] + vec.v[2]);
 	}
 
-	inline void operator+=(const Vec3& vec)
+	inline void operator+=(const Vec3 &vec)
 	{
 		v[0] += vec.v[0], v[1] += vec.v[1], v[2] += vec.v[2];
 	}
 
 	// SUBTRACT
-	inline Vec3 operator-(const Vec3& vec)
+	inline Vec3 operator-(const Vec3 &vec)
 	{
 		return Vec3(v[0] - vec.v[0], v[1] - vec.v[1], v[2] - vec.v[2]);
 	}
 
-	inline void operator-=(const Vec3& vec)
+	inline void operator-=(const Vec3 &vec)
 	{
 		v[0] -= vec.v[0], v[1] -= vec.v[1], v[2] -= vec.v[2];
 	}
 
 	// MULTIPLY
-	inline Vec3 operator*(const Vec3& vec)
+	inline Vec3 operator*(const Vec3 &vec)
 	{
 		return Vec3(v[0] * vec.v[0], v[1] * vec.v[1], v[2] * vec.v[2]);
 	}
 
-	inline void operator*=(const Vec3& vec)
+	inline void operator*=(const Vec3 &vec)
 	{
 		v[0] *= vec.v[0], v[1] *= vec.v[1], v[2] *= vec.v[2];
 	}
@@ -78,30 +79,29 @@ struct Vec3
 	}
 
 	// DIVIDE
-	inline Vec3 operator/(const Vec3& vec)
+	inline Vec3 operator/(const Vec3 &vec)
 	{
 		return Vec3(v[0] / vec.v[0], v[1] / vec.v[1], v[2] / vec.v[2]);
 	}
 
-	inline void operator/=(const Vec3& vec)
+	inline void operator/=(const Vec3 &vec)
 	{
 		v[0] /= vec.v[0], v[1] /= vec.v[1], v[2] /= vec.v[2];
 	}
 
 	// DOT PRODUCT
-	inline float Dot(const Vec3& vec)
+	inline float Dot(const Vec3 &vec)
 	{
 		return (v[0] * vec.v[0]) + (v[1] * vec.v[1]) + (v[2] * vec.v[2]);
 	}
 
 	// CROSS PRODUCT
-	inline Vec3 Cross(const Vec3& vec)
+	inline Vec3 Cross(const Vec3 &vec)
 	{
 		return Vec3(
 			v[1] * vec.v[2] - v[2] * vec.v[1],
 			v[2] * vec.v[0] - v[0] * vec.v[2],
-			v[0] * vec.v[1] - v[1] * vec.v[0]
-		);
+			v[0] * vec.v[1] - v[1] * vec.v[0]);
 	}
 
 	// LENGTH
@@ -114,5 +114,11 @@ struct Vec3
 	inline void normalize()
 	{
 		*this /= Length();
+	}
+
+	inline friend std::ostream &operator<<(std::ostream &os, const Vec3 &v)
+	{
+		os << "(" << v.X() << ", " << v.Y() << ", " << v.Z() << ")";
+		return os;
 	}
 };

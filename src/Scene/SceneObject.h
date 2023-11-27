@@ -17,7 +17,6 @@ public:
 	virtual Hit RayIntersect(Ray ray) = 0;
 	virtual Vec3 GetCenterPoint() = 0;
 	virtual BoundingBox GetBoundingBox() = 0;
-	
 
 	void SetMaterialName(std::string &name);
 
@@ -35,6 +34,7 @@ public:
 	virtual Hit RayIntersect(Ray ray);
 	virtual Vec3 GetCenterPoint();
 	virtual BoundingBox GetBoundingBox();
+	std::vector<Vec3> GetPoints();
 
 private:
 	Vec3 m_Points[3];

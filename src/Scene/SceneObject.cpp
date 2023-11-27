@@ -2,28 +2,26 @@
 
 #define EPSILON 0.0000001f
 
-
 // SCENE OBJECT
 
 /**
  * sets the name of the material that describes the surface of the scene object
- * 
+ *
  * \param name - name of the material as a string
  */
-void SceneObject::SetMaterialName(std::string& name)
+void SceneObject::SetMaterialName(std::string &name)
 {
 	m_MaterialName = name;
 }
-
 
 // TRIANGLE
 
 /**
  * create a triangle from 3 points
- * 
+ *
  * \param p0 - position of point 0 as a Vec3
  * \param p1 - position of point 1 as a Vec3
- * \param p2 - position of point 2 as a Vec3 
+ * \param p2 - position of point 2 as a Vec3
  */
 Triangle::Triangle(Vec3 p0, Vec3 p1, Vec3 p2)
 {
@@ -33,12 +31,14 @@ Triangle::Triangle(Vec3 p0, Vec3 p1, Vec3 p2)
 	m_Points[2] = p2;
 
 	// calculates the smallest of 3 floats
-	auto smallest = [](float x, float y, float z) {
+	auto smallest = [](float x, float y, float z)
+	{
 		return std::min(std::min(x, y), z);
 	};
 
 	// calculates the largest of 3 floats
-	auto largest = [](float x, float y, float z) {
+	auto largest = [](float x, float y, float z)
+	{
 		return std::max(std::max(x, y), z);
 	};
 
@@ -56,7 +56,7 @@ Triangle::Triangle(Vec3 p0, Vec3 p1, Vec3 p2)
 
 /**
  * calculates the normal of the surface of the triangle
- * 
+ *
  * \param position - the position on the triangle to calculate the normal of
  * \return - the normalmalized normal vector
  */
@@ -64,7 +64,7 @@ Vec3 Triangle::GetNormal(Vec3 position)
 {
 	Vec3 v1 = m_Points[1] - m_Points[0];
 	Vec3 v2 = m_Points[2] - m_Points[0];
-	
+
 	Vec3 normal = v1.Cross(v2);
 	normal.normalize();
 
@@ -75,7 +75,7 @@ Vec3 Triangle::GetNormal(Vec3 position)
  * calculates if a ray intersects the triangle
  * adapted from Moller-Trumbore intersection algorithm pseudocode on wikipedia
  * https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
- * 
+ *
  * \param ray - the ray that possibly interescts the triangle
  * \return - the hit object that tells if the ray interesects the triangle
  *			 along with other relevant information
@@ -83,7 +83,7 @@ Vec3 Triangle::GetNormal(Vec3 position)
 Hit Triangle::RayIntersect(Ray ray)
 {
 	Hit hit;
-	
+
 	Vec3 orig = ray.org;
 	Vec3 dir = ray.dir;
 
@@ -131,14 +131,15 @@ Hit Triangle::RayIntersect(Ray ray)
 
 	float t = e2.Dot(Q) * inv_det;
 
-	if (t > 0.0) {
-		
+	if (t > 0.0)
+	{
+
 		hit.isHit = true;
 		hit.materialName = m_MaterialName;
 		hit.normal = GetNormal(Vec3());
 		hit.time = t;
 		hit.position = ray.PosAt(t);
-		
+
 		return hit;
 	}
 
@@ -147,7 +148,7 @@ Hit Triangle::RayIntersect(Ray ray)
 
 /**
  * calculates the center point of the triangle by averaging all 3 points
- * 
+ *
  * \return - the center point as a Vec3
  */
 Vec3 Triangle::GetCenterPoint()
@@ -157,7 +158,7 @@ Vec3 Triangle::GetCenterPoint()
 
 /**
  * returns the axis aligned bounding box of the triangle
- * 
+ *
  * \return - the traingle's bounding box
  */
 BoundingBox Triangle::GetBoundingBox()
@@ -165,12 +166,16 @@ BoundingBox Triangle::GetBoundingBox()
 	return m_BoundingBox;
 }
 
+std::vector<Vec3> Triangle::GetPoints()
+{
+	return {m_Points[0], m_Points[1], m_Points[2]};
+}
 
 // SPHERE
 
 /**
  * creates a sphere scene object from a central point and radius
- * 
+ *
  * \param center - the center of the sphere as a Vec3
  * \param radius - the radius of the sphere
  */
@@ -190,17 +195,16 @@ Sphere::Sphere(Vec3 center, float radius)
 
 /**
  * calculates the normal vector of a point on a sphere
- * 
+ *
  * \param position - the position on the point of the sphere
- * \return - the normalized normal vector 
+ * \return - the normalized normal vector
  */
 Vec3 Sphere::GetNormal(Vec3 position)
 {
 	Vec3 normal(
-		position.v[0] - m_Center.v[0], 
-		position.v[1] - m_Center.v[1], 
-		position.v[2] - m_Center.v[2]
-	);
+		position.v[0] - m_Center.v[0],
+		position.v[1] - m_Center.v[1],
+		position.v[2] - m_Center.v[2]);
 	normal.normalize();
 
 	return normal;
@@ -208,7 +212,7 @@ Vec3 Sphere::GetNormal(Vec3 position)
 
 /**
  * calculates if a ray intersects a sphere
- * 
+ *
  * \param ray - the ray to test for an intersection
  * \return - the hit object that tells if the ray interesects the sphere
  *			 along with other relevant information
@@ -220,25 +224,29 @@ Hit Sphere::RayIntersect(Ray ray)
 	Vec3 L = m_Center - ray.org;
 
 	float tca = L.Dot(ray.dir);
-	if (tca < 0.0f) return hit;
+	if (tca < 0.0f)
+		return hit;
 
 	float d2 = L.Dot(L) - tca * tca;
 	float radius2 = m_Radius * m_Radius;
-	if (d2 > radius2) return hit;
+	if (d2 > radius2)
+		return hit;
 
 	float thc = sqrtf(radius2 - d2);
-	
+
 	float t0 = tca - thc;
 	float t1 = tca + thc;
 
-	if (t0 > t1) std::swap(t0, t1);
+	if (t0 > t1)
+		std::swap(t0, t1);
 
 	if (t0 < 0.0f)
 	{
-		
+
 		t0 = t1;
 		// t0 and t1 are both negative
-		if (t0 < 0.0f) return hit; 
+		if (t0 < 0.0f)
+			return hit;
 	}
 
 	hit.isHit = true;
@@ -252,7 +260,7 @@ Hit Sphere::RayIntersect(Ray ray)
 
 /**
  * returns the center point of the sphere
- * 
+ *
  * \return - the sphere's center point as a Vec3
  */
 Vec3 Sphere::GetCenterPoint()
@@ -262,7 +270,7 @@ Vec3 Sphere::GetCenterPoint()
 
 /**
  * returns the sphere's bounding box
- * 
+ *
  * \return - the sphere's bounding box
  */
 BoundingBox Sphere::GetBoundingBox()

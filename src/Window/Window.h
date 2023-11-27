@@ -13,7 +13,7 @@ public:
 	Window(std::string title, unsigned int width, unsigned int height);
 	~Window();
 
-	GLFWwindow* GetContext() const { return m_Window; };
+	GLFWwindow *GetContext() const { return m_Window; };
 	bool ShouldClose() const { return m_Data.m_Closed; };
 
 	std::pair<unsigned int, unsigned int> GetSize();
@@ -21,7 +21,8 @@ public:
 
 	void Update();
 
-	void SetPixelBuffer(PixelBuffer* pixelBuffer);
+	void SetPixelBuffer(PixelBuffer *pixelBuffer);
+	void PollEvents();
 
 private:
 	std::string m_Title;
@@ -31,10 +32,12 @@ private:
 		unsigned int m_Width = 0, m_Height = 0;
 		unsigned int m_FBWidth = 0, m_FBHeight = 0;
 		bool m_Closed = false;
-		PixelBuffer* m_PixelBuffer;
+		PixelBuffer *m_PixelBuffer;
 	};
 
 	WindowData m_Data;
 
-	GLFWwindow* m_Window;
+	GLFWwindow *m_Window;
+
+	static void KeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
 };

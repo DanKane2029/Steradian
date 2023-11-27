@@ -46,10 +46,13 @@ private:
 public:
 	ObjModel(std::string filePath);
 	std::vector<std::shared_ptr<SceneObject>> getSceneObjects();
+	inline std::vector<Vec3> getVertexList() { return vertexList; };
+	Vec3 getCenterPoint();
 
 private:
 	bool loadModel(std::string filePath);
 	std::vector<std::string> splitString(std::string &inputString, std::string delimiter);
 	Vec3 parseVec3(std::vector<std::string> &vertexData);
 	std::vector<FaceIndices> parseFace(std::vector<std::string> &faceIndices);
+	std::vector<Triangle> triangulateFace(std::vector<ObjModel::FaceIndices> faceIndices);
 };
