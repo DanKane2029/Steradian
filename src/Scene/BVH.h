@@ -1,14 +1,13 @@
 #pragma once
-#include "SceneObject.h"
-
-#include "BoundingBox.h"
-
-#include <vector>
 #include <algorithm>
-#include <iterator>
 #include <iostream>
+#include <iterator>
 #include <limits>
 #include <memory>
+#include <vector>
+
+#include "BoundingBox.h"
+#include "SceneObject.h"
 
 /**
  * bounding volume heirarchy (octree) used as an acceleration structure
@@ -16,17 +15,18 @@
  */
 class BVH
 {
-public:
-	BVH(std::vector<std::shared_ptr<SceneObject>> objectList);
+  public:
+    BVH(std::vector<std::shared_ptr<SceneObject>> objectList);
 
-private:
-	void PartitionSpace(std::vector<std::shared_ptr<SceneObject>> objectList, std::vector<BoundingBox*>& partitionedSpaces);
-	BoundingBox EncapsulateObjects(std::vector<std::shared_ptr<SceneObject>> objectList);
+  private:
+    void partitionSpace(std::vector<std::shared_ptr<SceneObject>> objectList,
+                        std::vector<BoundingBox *> &partitionedSpaces);
+    auto encapsulateObjects(std::vector<std::shared_ptr<SceneObject>> objectList) -> BoundingBox;
 
-public:
-	std::vector<BoundingBox> m_BoundingBoxes;
+  public:
+    std::vector<BoundingBox> m_BoundingBoxes{};
 
-private:
-	std::vector<std::shared_ptr<SceneObject>> m_OjectList;
-	unsigned int m_ObjectsInLeaf = 10;
+  private:
+    std::vector<std::shared_ptr<SceneObject>> m_OjectList{};
+    unsigned int m_ObjectsInLeaf = 10;
 };

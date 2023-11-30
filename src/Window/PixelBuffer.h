@@ -1,14 +1,14 @@
 #pragma once
-#include "Utils/Vec3.h"
-
 #include <memory>
+
+#include "Utils/Vec3.h"
 
 /**
  * a metadata object used for statistics and debuging
  */
 struct PixelMetaData
 {
-	unsigned int numRaysShot = 0;
+    unsigned int numRaysShot = 0;
 };
 
 /**
@@ -16,19 +16,19 @@ struct PixelMetaData
  */
 class PixelBuffer
 {
-public:
-	PixelBuffer(unsigned int width, unsigned int height);
-	~PixelBuffer();
+  public:
+    PixelBuffer(unsigned int width, unsigned int height);
+    ~PixelBuffer();
 
-	void SetPixel(unsigned int x, unsigned int y, Vec3 pixel);
-	float *GetPixels();
+    void setPixel(unsigned int x, unsigned int y, Vec3 pixel);
+    auto getPixels() -> float *;
 
-	void ResizeBuffer(unsigned int width, unsigned int height);
-	std::pair<unsigned int, unsigned int> GetSize();
+    void resizeBuffer(unsigned int width, unsigned int height);
+    auto getSize() -> std::pair<unsigned int, unsigned int>;
 
-private:
-	unsigned int m_Width, m_Height;
+  private:
+    unsigned int m_Width, m_Height;
 
-	float *m_Buffer;
-	PixelMetaData *m_MetaDataBuffer;
+    float *m_Buffer;
+    PixelMetaData *m_MetaDataBuffer;
 };

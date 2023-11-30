@@ -1,56 +1,59 @@
 #pragma once
-#include "Utils/Vec3.h"
-#include "RayTracer/Ray.h"
-#include "RayTracer/Hit.h"
-#include "BoundingBox.h"
-
 #include <string>
 #include <vector>
+
+#include "BoundingBox.h"
+#include "RayTracer/Hit.h"
+#include "RayTracer/Ray.h"
+#include "Utils/Vec3.h"
 
 /**
  * the base class of all objects in a scene
  */
 class SceneObject
 {
-public:
-	virtual Vec3 GetNormal(Vec3 position) = 0;
-	virtual Hit RayIntersect(Ray ray) = 0;
-	virtual Vec3 GetCenterPoint() = 0;
-	virtual BoundingBox GetBoundingBox() = 0;
+  public:
+    virtual ~SceneObject() = default;
+    virtual Vec3 getNormal(Vec3 position) = 0;
+    virtual Hit rayIntersect(Ray ray) = 0;
+    virtual Vec3 getCenterPoint() = 0;
+    virtual BoundingBox getBoundingBox() = 0;
 
-	void SetMaterialName(std::string &name);
+    void setMaterialName(std::string &name);
 
-protected:
-	std::string m_MaterialName;
-	BoundingBox m_BoundingBox;
+  protected:
+    std::string m_MaterialName;
+    BoundingBox m_BoundingBox;
 };
 
 class Triangle : public SceneObject
 {
-public:
-	Triangle(Vec3 p0, Vec3 p1, Vec3 p2);
+  public:
+    ~Triangle() override = default;
+    Triangle(Vec3 p0, Vec3 p1, Vec3 p2);
 
-	virtual Vec3 GetNormal(Vec3 position);
-	virtual Hit RayIntersect(Ray ray);
-	virtual Vec3 GetCenterPoint();
-	virtual BoundingBox GetBoundingBox();
-	std::vector<Vec3> GetPoints();
+    Vec3 getNormal(Vec3 position) override;
+    Hit rayIntersect(Ray ray) override;
+    Vec3 getCenterPoint() override;
+    BoundingBox getBoundingBox() override;
+    auto getPoints() -> std::vector<Vec3>;
 
-private:
-	Vec3 m_Points[3];
+  private:
+    Vec3 m_Points[3];
 };
 
 class Sphere : public SceneObject
 {
-public:
-	Sphere(Vec3 center, float radius);
+  public:
+    ~Sphere() override = default;
+    Sphere(Vec3 center, float radius);
 
-	Vec3 GetNormal(Vec3 position);
-	Hit RayIntersect(Ray ray);
-	Vec3 GetCenterPoint();
-	BoundingBox GetBoundingBox();
+    Vec3 getNormal(Vec3 position) override;
+    Hit rayIntersect(Ray ray) override;
+    Vec3 getCenterPoint() override;
+    BoundingBox getBoundingBox() override;
 
-private:
-	Vec3 m_Center;
-	float m_Radius;
+  private:
+    Vec3 m_Center{};
+    float m_Radius;
 };

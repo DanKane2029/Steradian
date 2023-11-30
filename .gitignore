@@ -17,8 +17,12 @@ lib
 path_tracer.dir
 x64
 CMakeDoxyfile.in
+compile_commands.json
 
 # Make files
 Makefile
 *.a
 path_tracer
+
+# Third Party
+third_party

@@ -1,4 +1,5 @@
 #pragma once
+#include "Utils/Vec3.h"
 #include <string>
 
 /**
@@ -6,24 +7,22 @@
  */
 struct Hit
 {
-	bool isHit;
-	float time;
+    bool isHit{false};
+    float time;
 
-	std::string materialName;
+    std::string materialName;
 
-	Vec3 position;
-	Vec3 normal;
+    Vec3 position{};
+    Vec3 normal{};
 
-	Vec3 color;
+    Vec3 color{};
 
-	Hit()
-	{
-		isHit = false;
-		time = INFINITY;
+    Hit() : time(INFINITY)
+    {
 
-		materialName;
+        materialName;
 
-		position = Vec3();
-		normal = Vec3();
-	}
+        position = Vec3();
+        normal = Vec3();
+    }
 };

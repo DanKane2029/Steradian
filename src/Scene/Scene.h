@@ -1,41 +1,74 @@
 #pragma once
-#include "SceneObject.h"
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+#include "BVH.h"
 #include "Light.h"
 #include "Material.h"
-#include "BVH.h"
-
-#include <string>
-#include <vector>
-#include <unordered_map>
-#include <memory>
+#include "RayTracer/Camera.h"
+#include "SceneObject.h"
 
 /**
- * a collection of primitive scene objects, lights, and materials 
+ * a collection of primitive scene objects, lights, and materials
  * that describe a scene for the ray tracer to render
  */
 class Scene
 {
-public:
-	std::vector<std::shared_ptr<SceneObject>> GetObjectList();
-	void AddObject(std::shared_ptr<SceneObject> sceneObject, std::string materialName);
-	void AddObjects(std::vector<std::shared_ptr<SceneObject>> sceneObjectList, std::string materialName);
-	
-	std::vector<Light*> GetLightList();
-	void AddLight(Light* light);
+  public:
+    Scene(std::string filePath);
 
-	void RegisterMaterial(Material* material);
-	Material* GetMaterial(std::string materialName);
+  private:
+    struct Keywords
+    {
+        std::string ambientLighting = "ambientLighting";
+        std::string camera = "camera";
+        std::string cameraOrg = "org";
+        std::string cameraLookAt = "lookAt";
+        std::string materials = "materials";
+        std::string objects = "objects";
+        std::string lights = "lights";
+        std::string type = "type";
+    };
+    const Keywords m_keywords;
 
-	Vec3 inline GetAmbientLighting() { return m_AmbientLighting; };
-	void inline SetAmbientLighting(Vec3 al) { m_AmbientLighting = al; };
+    Vec3 m_AmbientLighting;
 
-	void CreateAcceleratedStructure();
+    std::vector<std::shared_ptr<SceneObject>> m_ObjectList{};
+    std::vector<Light *> m_LightList{};
+    std::unordered_map<std::string, Material *> m_MaterialStore{};
 
-private:
-	Vec3 m_AmbientLighting;
+    std::shared_ptr<BVH> m_AcceleratedStructure{};
+    Camera m_Camera;
 
-	std::vector<std::shared_ptr<SceneObject>> m_ObjectList;
-	std::vector<Light*> m_LightList;
-	std::unordered_map<std::string, Material*> m_MaterialStore;
-	BVH* m_AcceleratedStructure;
+  public:
+    std::vector<std::shared_ptr<SceneObject>> getObjectList();
+    void addObject(std::shared_ptr<SceneObject> sceneObject, std::string materialName);
+    void addObjects(std::vector<std::shared_ptr<SceneObject>> sceneObjectList, std::string materialName);
+
+    std::vector<Light *> getLightList();
+    void addLight(Light *light);
+
+    void registerMaterial(Material *material);
+    auto getMaterial(std::string materialName) -> Material *;
+
+    static Scene loadFromJson(std::string filePath);
+
+    auto inline getAmbientLighting() -> Vec3
+    {
+        return m_AmbientLighting;
+    };
+
+    void inline setAmbientLighting(Vec3 al)
+    {
+        m_AmbientLighting = al;
+    };
+
+    Camera inline getCamera()
+    {
+        return m_Camera;
+    }
+
+    void createAcceleratedStructure();
 };

@@ -6,17 +6,16 @@
  */
 struct Ray
 {
-	Vec3 org, dir;
+    Vec3 org, dir;
 
-	Ray(Vec3 org, Vec3 dir)
-	{
-		this->org = org;
-		this->dir = dir;
-		this->dir.normalize();
-	}
+    Ray(Vec3 org, Vec3 dir) : org(org), dir(dir)
+    {
 
-	Vec3 PosAt(float t)
-	{
-		return org + (dir * t);
-	}
+        this->dir.normalize();
+    }
+
+    auto posAt(float t) -> Vec3
+    {
+        return org + (dir * t);
+    }
 };

@@ -1,4 +1,5 @@
 #include "Window.h"
+
 #include <iostream>
 
 /**
@@ -10,65 +11,63 @@
  * \param width - the initial width of the wimdow
  * \param height - the initial height of the window
  */
-Window::Window(std::string title, unsigned int width, unsigned int height)
-	: m_Title(title)
+Window::Window(std::string title, unsigned int width, unsigned int height) : m_Title(title)
 {
-	// Set Error Callback
-	glfwSetErrorCallback([](int error, const char *description)
-						 { printf("Error: %s\n", description); });
+    // Set Error Callback
+    glfwSetErrorCallback([](int error, const char *description) { printf("Error: %s\n", description); });
 
-	// check if GLFW initialized correctly
-	if (!glfwInit())
-	{
-		exit(EXIT_FAILURE);
-	}
+    // check if GLFW initialized correctly
+    if (!glfwInit())
+    {
+        exit(EXIT_FAILURE);
+    }
 
-	// create GLFW window and context
-	m_Window = glfwCreateWindow(width, height, title.c_str(), NULL, NULL);
+    // create GLFW window and context
+    m_Window = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
 
-	// Set user pointer for window data
-	glfwSetWindowUserPointer(m_Window, &m_Data);
+    // Set user pointer for window data
+    glfwSetWindowUserPointer(m_Window, &m_Data);
 
-	// check if window create failed
-	if (!m_Window)
-	{
-		glfwTerminate();
-		exit(EXIT_FAILURE);
-	}
+    // check if window create failed
+    if (!m_Window)
+    {
+        glfwTerminate();
+        exit(EXIT_FAILURE);
+    }
 
-	m_Data.m_Width = width;
-	m_Data.m_Height = height;
+    m_Data.m_Width = width;
+    m_Data.m_Height = height;
 
-	glfwMakeContextCurrent(m_Window);
-	glfwSwapInterval(1);
+    glfwMakeContextCurrent(m_Window);
+    glfwSwapInterval(1);
 
-	glfwGetFramebufferSize(m_Window, (int *)&m_Data.m_FBWidth, (int *)&m_Data.m_FBHeight);
+    glfwGetFramebufferSize(m_Window, (int *)&m_Data.m_FBWidth, (int *)&m_Data.m_FBHeight);
 
-	// Set Input Callbacks
-	glfwSetWindowCloseCallback(m_Window, [](GLFWwindow *window)
-							   {
-		WindowData* data = (WindowData*)glfwGetWindowUserPointer(window);
-		data->m_Closed = true; });
+    // Set Input Callbacks
+    glfwSetWindowCloseCallback(m_Window, [](GLFWwindow *window) {
+        auto *data = (WindowData *)glfwGetWindowUserPointer(window);
+        data->m_Closed = true;
+    });
 
-	glfwSetWindowSizeCallback(m_Window, [](GLFWwindow *window, int width, int height)
-							  {
-		WindowData* data = (WindowData*)glfwGetWindowUserPointer(window);
+    glfwSetWindowSizeCallback(m_Window, [](GLFWwindow *window, int width, int height) {
+        auto *data = (WindowData *)glfwGetWindowUserPointer(window);
 
-		data->m_Width = width;
-		data->m_Height = height; });
+        data->m_Width = width;
+        data->m_Height = height;
+    });
 
-	glfwSetKeyCallback(m_Window, KeyCallback);
+    glfwSetKeyCallback(m_Window, keyCallback);
 
-	glfwSetFramebufferSizeCallback(m_Window, [](GLFWwindow *window, int width, int height)
-								   {
-		WindowData* data = (WindowData*)glfwGetWindowUserPointer(window);
+    glfwSetFramebufferSizeCallback(m_Window, [](GLFWwindow *window, int width, int height) {
+        auto *data = (WindowData *)glfwGetWindowUserPointer(window);
 
-		data->m_FBWidth = width;
-		data->m_FBHeight = height;
+        data->m_FBWidth = width;
+        data->m_FBHeight = height;
 
-		data->m_PixelBuffer->ResizeBuffer(width, height);
+        data->m_PixelBuffer->resizeBuffer(width, height);
 
-		glViewport(0, 0, width, height); });
+        glViewport(0, 0, width, height);
+    });
 }
 
 /**
@@ -76,7 +75,7 @@ Window::Window(std::string title, unsigned int width, unsigned int height)
  */
 Window::~Window()
 {
-	glfwDestroyWindow(m_Window);
+    glfwDestroyWindow(m_Window);
 }
 
 /**
@@ -84,9 +83,9 @@ Window::~Window()
  *
  * \return - the <width, height> window size pair
  */
-std::pair<unsigned int, unsigned int> Window::GetSize()
+auto Window::getSize() -> std::pair<unsigned int, unsigned int>
 {
-	return std::make_pair(m_Data.m_Width, m_Data.m_Height);
+    return std::make_pair(m_Data.m_Width, m_Data.m_Height);
 }
 
 /**
@@ -95,9 +94,9 @@ std::pair<unsigned int, unsigned int> Window::GetSize()
  *
  * \return - the <width, height> window framebuffer size pair
  */
-std::pair<unsigned int, unsigned int> Window::GetFrameBufferSize()
+auto Window::getFrameBufferSize() -> std::pair<unsigned int, unsigned int>
 {
-	return std::make_pair(m_Data.m_FBWidth, m_Data.m_FBHeight);
+    return std::make_pair(m_Data.m_FBWidth, m_Data.m_FBHeight);
 }
 
 /**
@@ -105,11 +104,11 @@ std::pair<unsigned int, unsigned int> Window::GetFrameBufferSize()
  * TODO: glDrawPixels is deprecated in OpenGL 4, change to more modern way
  *		by useing a framebuffer object
  */
-void Window::Update()
+void Window::update()
 {
-	glDrawPixels(m_Data.m_Width, m_Data.m_Height, GL_RGB, GL_FLOAT, m_Data.m_PixelBuffer->GetPixels());
-	glfwSwapBuffers(m_Window);
-	glfwPollEvents();
+    glDrawPixels(m_Data.m_Width, m_Data.m_Height, GL_RGB, GL_FLOAT, m_Data.m_PixelBuffer->getPixels());
+    glfwSwapBuffers(m_Window);
+    glfwPollEvents();
 }
 
 /**
@@ -117,22 +116,22 @@ void Window::Update()
  *
  * \param pixelBuffer - the pixel buffer object to copy from
  */
-void Window::SetPixelBuffer(PixelBuffer *pixelBuffer)
+void Window::setPixelBuffer(PixelBuffer *pixelBuffer)
 {
-	m_Data.m_PixelBuffer = pixelBuffer;
+    m_Data.m_PixelBuffer = pixelBuffer;
 }
 
-void Window::PollEvents()
+void Window::pollEvents()
 {
-	glfwPollEvents();
+    glfwPollEvents();
 }
 
-void Window::KeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
+void Window::keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
-	WindowData *data = reinterpret_cast<WindowData *>(glfwGetWindowUserPointer(window));
+    auto *data = reinterpret_cast<WindowData *>(glfwGetWindowUserPointer(window));
 
-	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-	{
-		data->m_Closed = true;
-	}
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+    {
+        data->m_Closed = true;
+    }
 }

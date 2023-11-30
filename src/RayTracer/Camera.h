@@ -1,5 +1,7 @@
 #pragma once
 #include "Utils/Vec3.h"
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
 
 /**
  * describes the perspective the rendered image using
@@ -7,13 +9,21 @@
  */
 struct Camera
 {
-	Vec3 org, dir;
+    Vec3 org, dir;
 
-	Camera(Vec3 org, Vec3 lookAt)
-	{
-		this->org = org;
+    Camera() : org(Vec3()), dir(Vec3(0, 0, 1))
+    {
+    }
 
-		this->dir = lookAt - org;
-		this->dir.normalize();
-	}
+    Camera(Vec3 org, Vec3 lookAt) : org(org)
+    {
+
+        this->dir = lookAt - org;
+        this->dir.normalize();
+    }
+
+    void from_json(const json &j, Camera &c)
+    {
+        std::cout << "camera org: " << j["org"] << std::endl;
+    }
 };

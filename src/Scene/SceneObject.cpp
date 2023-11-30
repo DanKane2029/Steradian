@@ -1,5 +1,9 @@
 #include "SceneObject.h"
 
+#include <cmath>
+
+#include <cmath>
+
 #define EPSILON 0.0000001f
 
 // SCENE OBJECT
@@ -9,9 +13,9 @@
  *
  * \param name - name of the material as a string
  */
-void SceneObject::SetMaterialName(std::string &name)
+void SceneObject::setMaterialName(std::string &name)
 {
-	m_MaterialName = name;
+    m_MaterialName = name;
 }
 
 // TRIANGLE
@@ -25,33 +29,27 @@ void SceneObject::SetMaterialName(std::string &name)
  */
 Triangle::Triangle(Vec3 p0, Vec3 p1, Vec3 p2)
 {
-	// assign points
-	m_Points[0] = p0;
-	m_Points[1] = p1;
-	m_Points[2] = p2;
+    // assign points
+    m_Points[0] = p0;
+    m_Points[1] = p1;
+    m_Points[2] = p2;
 
-	// calculates the smallest of 3 floats
-	auto smallest = [](float x, float y, float z)
-	{
-		return std::min(std::min(x, y), z);
-	};
+    // calculates the smallest of 3 floats
+    auto smallest = [](float x, float y, float z) { return std::min(std::min(x, y), z); };
 
-	// calculates the largest of 3 floats
-	auto largest = [](float x, float y, float z)
-	{
-		return std::max(std::max(x, y), z);
-	};
+    // calculates the largest of 3 floats
+    auto largest = [](float x, float y, float z) { return std::max(std::max(x, y), z); };
 
-	// calculate bounding box by finding the min and max x, y, & z coordinates
-	float minX = smallest(m_Points[0].v[0], m_Points[1].v[0], m_Points[2].v[0]);
-	float minY = smallest(m_Points[0].v[1], m_Points[1].v[1], m_Points[2].v[1]);
-	float minZ = smallest(m_Points[0].v[2], m_Points[1].v[2], m_Points[2].v[2]);
+    // calculate bounding box by finding the min and max x, y, & z coordinates
+    float minX = smallest(m_Points[0].v[0], m_Points[1].v[0], m_Points[2].v[0]);
+    float minY = smallest(m_Points[0].v[1], m_Points[1].v[1], m_Points[2].v[1]);
+    float minZ = smallest(m_Points[0].v[2], m_Points[1].v[2], m_Points[2].v[2]);
 
-	float maxX = largest(m_Points[0].v[0], m_Points[1].v[0], m_Points[2].v[0]);
-	float maxY = largest(m_Points[0].v[1], m_Points[1].v[1], m_Points[2].v[1]);
-	float maxZ = largest(m_Points[0].v[2], m_Points[1].v[2], m_Points[2].v[2]);
+    float maxX = largest(m_Points[0].v[0], m_Points[1].v[0], m_Points[2].v[0]);
+    float maxY = largest(m_Points[0].v[1], m_Points[1].v[1], m_Points[2].v[1]);
+    float maxZ = largest(m_Points[0].v[2], m_Points[1].v[2], m_Points[2].v[2]);
 
-	m_BoundingBox = BoundingBox(minX, minY, minZ, maxX, maxY, maxZ);
+    m_BoundingBox = BoundingBox(minX, minY, minZ, maxX, maxY, maxZ);
 }
 
 /**
@@ -60,15 +58,15 @@ Triangle::Triangle(Vec3 p0, Vec3 p1, Vec3 p2)
  * \param position - the position on the triangle to calculate the normal of
  * \return - the normalmalized normal vector
  */
-Vec3 Triangle::GetNormal(Vec3 position)
+Vec3 Triangle::getNormal(Vec3 position)
 {
-	Vec3 v1 = m_Points[1] - m_Points[0];
-	Vec3 v2 = m_Points[2] - m_Points[0];
+    Vec3 v1 = m_Points[1] - m_Points[0];
+    Vec3 v2 = m_Points[2] - m_Points[0];
 
-	Vec3 normal = v1.Cross(v2);
-	normal.normalize();
+    Vec3 normal = v1.cross(v2);
+    normal.normalize();
 
-	return normal;
+    return normal;
 }
 
 /**
@@ -80,70 +78,69 @@ Vec3 Triangle::GetNormal(Vec3 position)
  * \return - the hit object that tells if the ray interesects the triangle
  *			 along with other relevant information
  */
-Hit Triangle::RayIntersect(Ray ray)
+auto Triangle::rayIntersect(Ray ray) -> Hit
 {
-	Hit hit;
+    Hit hit;
 
-	Vec3 orig = ray.org;
-	Vec3 dir = ray.dir;
+    Vec3 orig = ray.org;
+    Vec3 dir = ray.dir;
 
-	Vec3 v0 = m_Points[0];
-	Vec3 v1 = m_Points[1];
-	Vec3 v2 = m_Points[2];
+    Vec3 v0 = m_Points[0];
+    Vec3 v1 = m_Points[1];
+    Vec3 v2 = m_Points[2];
 
-	// vectors for edges sharing V1
-	Vec3 e1 = v1 - v0;
-	Vec3 e2 = v2 - v0;
+    // vectors for edges sharing V1
+    Vec3 e1 = v1 - v0;
+    Vec3 e2 = v2 - v0;
 
-	// begin calculating determinant - also used to calculate u param
-	Vec3 P = dir.Cross(e2);
+    // begin calculating determinant - also used to calculate u param
+    Vec3 p = dir.cross(e2);
 
-	// if determinant is near zero, ray lies in plane of triangle
-	float det = e1.Dot(P);
-	// NOT culling
-	if (det > -EPSILON && det < EPSILON)
-	{
-		return hit;
-	}
-	float inv_det = 1.0f / det;
+    // if determinant is near zero, ray lies in plane of triangle
+    float det = e1.dot(p);
+    // NOT culling
+    if (det > -EPSILON && det < EPSILON)
+    {
+        return hit;
+    }
+    float invDet = 1.0f / det;
 
-	// calculate distance from v0 to ray origin
-	Vec3 T = orig - v0;
+    // calculate distance from v0 to ray origin
+    Vec3 dist = orig - v0;
 
-	// calculate u parameter and test bound
-	float u = T.Dot(P) * inv_det;
-	// the intersection lies outside of the triangle
-	if (u < 0.0f || u > 1.0f)
-	{
-		return hit;
-	}
-	// prepare to test v parameter
-	Vec3 Q = T.Cross(e1);
+    // calculate u parameter and test bound
+    float u = dist.dot(p) * invDet;
+    // the intersection lies outside of the triangle
+    if (u < 0.0f || u > 1.0f)
+    {
+        return hit;
+    }
+    // prepare to test v parameter
+    Vec3 q = dist.cross(e1);
 
-	// calculate v param and test bound
-	float v = dir.Dot(Q) * inv_det;
+    // calculate v param and test bound
+    float v = dir.dot(q) * invDet;
 
-	// the intersection is outside the triangle
-	if (v < 0.0 || (u + v) > 1.0f)
-	{
-		return hit;
-	}
+    // the intersection is outside the triangle
+    if (v < 0.0 || (u + v) > 1.0f)
+    {
+        return hit;
+    }
 
-	float t = e2.Dot(Q) * inv_det;
+    float t = e2.dot(q) * invDet;
 
-	if (t > 0.0)
-	{
+    if (t > 0.0)
+    {
+        hit.isHit = true;
+        hit.materialName = m_MaterialName;
+        hit.normal = getNormal(Vec3());
+        hit.time = t;
+        hit.position = ray.posAt(t);
 
-		hit.isHit = true;
-		hit.materialName = m_MaterialName;
-		hit.normal = GetNormal(Vec3());
-		hit.time = t;
-		hit.position = ray.PosAt(t);
+        return hit;
+    }
 
-		return hit;
-	}
-
-	return hit;
+    return hit;
 }
 
 /**
@@ -151,9 +148,9 @@ Hit Triangle::RayIntersect(Ray ray)
  *
  * \return - the center point as a Vec3
  */
-Vec3 Triangle::GetCenterPoint()
+auto Triangle::getCenterPoint() -> Vec3
 {
-	return (m_Points[0] + m_Points[1] + m_Points[2]) / 3.0f;
+    return (m_Points[0] + m_Points[1] + m_Points[2]) / 3.0f;
 }
 
 /**
@@ -161,14 +158,14 @@ Vec3 Triangle::GetCenterPoint()
  *
  * \return - the traingle's bounding box
  */
-BoundingBox Triangle::GetBoundingBox()
+auto Triangle::getBoundingBox() -> BoundingBox
 {
-	return m_BoundingBox;
+    return m_BoundingBox;
 }
 
-std::vector<Vec3> Triangle::GetPoints()
+std::vector<Vec3> Triangle::getPoints()
 {
-	return {m_Points[0], m_Points[1], m_Points[2]};
+    return {m_Points[0], m_Points[1], m_Points[2]};
 }
 
 // SPHERE
@@ -179,18 +176,17 @@ std::vector<Vec3> Triangle::GetPoints()
  * \param center - the center of the sphere as a Vec3
  * \param radius - the radius of the sphere
  */
-Sphere::Sphere(Vec3 center, float radius)
-	: m_Center(center), m_Radius(radius)
+Sphere::Sphere(Vec3 center, float radius) : m_Center(center), m_Radius(radius)
 {
-	float minX = m_Center.v[0] - m_Radius;
-	float minY = m_Center.v[1] - m_Radius;
-	float minZ = m_Center.v[2] - m_Radius;
+    float minX = m_Center.v[0] - m_Radius;
+    float minY = m_Center.v[1] - m_Radius;
+    float minZ = m_Center.v[2] - m_Radius;
 
-	float maxX = m_Center.v[0] + m_Radius;
-	float maxY = m_Center.v[1] + m_Radius;
-	float maxZ = m_Center.v[2] + m_Radius;
+    float maxX = m_Center.v[0] + m_Radius;
+    float maxY = m_Center.v[1] + m_Radius;
+    float maxZ = m_Center.v[2] + m_Radius;
 
-	m_BoundingBox = BoundingBox(minX, minY, minZ, maxX, maxY, maxZ);
+    m_BoundingBox = BoundingBox(minX, minY, minZ, maxX, maxY, maxZ);
 }
 
 /**
@@ -199,15 +195,12 @@ Sphere::Sphere(Vec3 center, float radius)
  * \param position - the position on the point of the sphere
  * \return - the normalized normal vector
  */
-Vec3 Sphere::GetNormal(Vec3 position)
+auto Sphere::getNormal(Vec3 position) -> Vec3
 {
-	Vec3 normal(
-		position.v[0] - m_Center.v[0],
-		position.v[1] - m_Center.v[1],
-		position.v[2] - m_Center.v[2]);
-	normal.normalize();
+    Vec3 normal = Vec3(position.v[0] - m_Center.v[0], position.v[1] - m_Center.v[1], position.v[2] - m_Center.v[2]);
+    normal.normalize();
 
-	return normal;
+    return normal;
 }
 
 /**
@@ -217,45 +210,44 @@ Vec3 Sphere::GetNormal(Vec3 position)
  * \return - the hit object that tells if the ray interesects the sphere
  *			 along with other relevant information
  */
-Hit Sphere::RayIntersect(Ray ray)
+auto Sphere::rayIntersect(Ray ray) -> Hit
 {
-	Hit hit;
+    Hit hit;
 
-	Vec3 L = m_Center - ray.org;
+    Vec3 l = m_Center - ray.org;
 
-	float tca = L.Dot(ray.dir);
-	if (tca < 0.0f)
-		return hit;
+    float tca = l.dot(ray.dir);
+    if (tca < 0.0f)
+        return hit;
 
-	float d2 = L.Dot(L) - tca * tca;
-	float radius2 = m_Radius * m_Radius;
-	if (d2 > radius2)
-		return hit;
+    float d2 = l.dot(l) - tca * tca;
+    float radius2 = m_Radius * m_Radius;
+    if (d2 > radius2)
+        return hit;
 
-	float thc = sqrtf(radius2 - d2);
+    float thc = sqrtf(radius2 - d2);
 
-	float t0 = tca - thc;
-	float t1 = tca + thc;
+    float t0 = tca - thc;
+    float t1 = tca + thc;
 
-	if (t0 > t1)
-		std::swap(t0, t1);
+    if (t0 > t1)
+        std::swap(t0, t1);
 
-	if (t0 < 0.0f)
-	{
+    if (t0 < 0.0f)
+    {
+        t0 = t1;
+        // t0 and t1 are both negative
+        if (t0 < 0.0f)
+            return hit;
+    }
 
-		t0 = t1;
-		// t0 and t1 are both negative
-		if (t0 < 0.0f)
-			return hit;
-	}
+    hit.isHit = true;
+    hit.materialName = m_MaterialName;
+    hit.time = t0;
+    hit.position = ray.posAt(t0);
+    hit.normal = getNormal(hit.position);
 
-	hit.isHit = true;
-	hit.materialName = m_MaterialName;
-	hit.time = t0;
-	hit.position = ray.PosAt(t0);
-	hit.normal = GetNormal(hit.position);
-
-	return hit;
+    return hit;
 }
 
 /**
@@ -263,9 +255,9 @@ Hit Sphere::RayIntersect(Ray ray)
  *
  * \return - the sphere's center point as a Vec3
  */
-Vec3 Sphere::GetCenterPoint()
+auto Sphere::getCenterPoint() -> Vec3
 {
-	return m_Center;
+    return m_Center;
 }
 
 /**
@@ -273,7 +265,7 @@ Vec3 Sphere::GetCenterPoint()
  *
  * \return - the sphere's bounding box
  */
-BoundingBox Sphere::GetBoundingBox()
+auto Sphere::getBoundingBox() -> BoundingBox
 {
-	return m_BoundingBox;
+    return m_BoundingBox;
 }
