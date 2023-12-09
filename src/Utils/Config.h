@@ -17,8 +17,8 @@ class Config
     Keywords m_keywrods;
 
   public:
-    unsigned int windowHeight{};
-    unsigned int windowWidth{};
+    int windowHeight{};
+    int windowWidth{};
     unsigned int fps;
     unsigned int numThreads;
 

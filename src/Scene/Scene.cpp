@@ -52,7 +52,7 @@ void Scene::addObjects(std::vector<std::shared_ptr<SceneObject>> sceneObjectList
  *
  * \return - the list of light pointers in the scene
  */
-auto Scene::getLightList() -> std::vector<Light *>
+auto Scene::getLightList() -> std::vector<std::shared_ptr<Light>>
 {
     return m_LightList;
 }
@@ -62,7 +62,7 @@ auto Scene::getLightList() -> std::vector<Light *>
  *
  * \param light - the pointer to the light to be added to the scene
  */
-void Scene::addLight(Light *light)
+void Scene::addLight(std::shared_ptr<Light> light)
 {
     m_LightList.push_back(light);
 }
@@ -73,9 +73,9 @@ void Scene::addLight(Light *light)
  *
  * \param material - the pointer to the material to be registered
  */
-void Scene::registerMaterial(Material *material)
+void Scene::registerMaterial(Material material)
 {
-    m_MaterialStore[material->name] = material;
+    m_MaterialStore[material.name] = material;
 }
 
 /**
@@ -95,7 +95,7 @@ auto Scene::getMaterial(std::string materialName) -> Material *
     }
     else
     {
-        return m_MaterialStore.at(materialName);
+        return &m_MaterialStore.at(materialName);
     }
 }
 
@@ -120,6 +120,7 @@ Scene::Scene(std::string filePath)
 {
     std::ifstream f(filePath);
     json data = json::parse(f);
+    f.close();
 
     m_AmbientLighting = Vec3(data.at(m_keywords.ambientLighting).get<std::vector<float>>());
     m_Camera = Camera(Vec3(data.at(m_keywords.camera).at(m_keywords.cameraOrg).get<std::vector<float>>()),
@@ -136,7 +137,7 @@ Scene::Scene(std::string filePath)
         float shininess = materialData.at("shininess");
         std::vector<float> color = materialData.at("color");
         Material material(name, color, ambient, diffuse, specular, shininess);
-        registerMaterial(&material);
+        registerMaterial(material);
     }
 
     std::vector<json> objectList = data.at(m_keywords.objects);
@@ -149,6 +150,19 @@ Scene::Scene(std::string filePath)
             std::string path = object.at("path");
             ObjModel objModel(path);
             addObjects(objModel.getSceneObjects(), materialId);
+        }
+        else if (type == "triangle")
+        {
+            Vec3 point0(object.at("point0").get<std::vector<float>>());
+            Vec3 point1(object.at("point1").get<std::vector<float>>());
+            Vec3 point2(object.at("point2").get<std::vector<float>>());
+            addObject(std::make_shared<Triangle>(point0, point1, point2), materialId);
+        }
+        else if (type == "sphere")
+        {
+            Vec3 center(object.at("center").get<std::vector<float>>());
+            float radius = object.at("radius");
+            addObject(std::make_shared<Sphere>(center, radius), materialId);
         }
     }
 
@@ -163,7 +177,7 @@ Scene::Scene(std::string filePath)
             float intensity = light.at("intensity");
             float radius = light.at("radius");
             PointLight pointLight(pos, color, intensity, radius);
-            addLight(&pointLight);
+            addLight(std::make_shared<Light>(pointLight));
         }
     }
 }

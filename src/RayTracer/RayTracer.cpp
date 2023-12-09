@@ -66,11 +66,20 @@ void RayTracer::sampleScene(float x, float y)
     {
         Vec3 color = getHitColor(hit);
 
-        auto ix = (unsigned int)floorf((size.first - 1) * x);
-        auto iy = (unsigned int)floorf((size.second - 1) * y);
+        int ix = static_cast<int>(floorf(static_cast<float>(size.first - 1) * x));
+        int iy = static_cast<int>(floorf(static_cast<float>(size.second - 1) * y));
 
         m_PixelBufferGuard.lock();
         m_PixelBuffer->setPixel(ix, iy, color);
+        m_PixelBufferGuard.unlock();
+    }
+    else
+    {
+        int ix = static_cast<int>(floorf(static_cast<float>(size.first - 1) * x));
+        int iy = static_cast<int>(floorf(static_cast<float>(size.second - 1) * y));
+
+        m_PixelBufferGuard.lock();
+        m_PixelBuffer->setPixel(ix, iy, Vec3());
         m_PixelBufferGuard.unlock();
     }
 }
@@ -109,31 +118,32 @@ auto RayTracer::shootRay(Ray ray) -> Hit
  */
 auto RayTracer::getHitColor(Hit hit) -> Vec3
 {
-    Material mat = *m_Scene->getMaterial(hit.materialName);
+    Material mat = *(m_Scene->getMaterial(hit.materialName));
 
     Vec3 finalColor = 0;
 
-    finalColor += mat.color * m_Scene->getAmbientLighting() * mat.ambient;
+    finalColor += m_Scene->getAmbientLighting() * (mat.color * mat.ambient);
 
-    for (Light *light : m_Scene->getLightList())
+    for (std::shared_ptr<Light> light : m_Scene->getLightList())
     {
+        // diffuse component
         Vec3 lightDir = light->getPos() - hit.position;
         lightDir.normalize();
+        Vec3 diffuse = light->getColor() * std::max(lightDir.dot(hit.normal), 0.0f) * mat.diffuse;
 
-        Vec3 diffuse = light->getColor() * mat.diffuse * std::max(lightDir.dot(hit.normal), 0.0f);
-
-        Vec3 reflection = lightDir - (hit.normal * 2.0f * lightDir.dot(hit.normal));
-        reflection.normalize();
-
-        Vec3 view = hit.position - m_Scene->getCamera().org;
+        // specular component (Jim Blinn)
+        Vec3 view = m_Scene->getCamera().org - hit.position;
         view.normalize();
 
-        Vec3 specular =
-            Vec3(1.0f, 1.0f, 1.0f) * mat.specular * powf(std::max(reflection.dot(view), 0.0f), mat.shininess);
+        Vec3 halfWay = lightDir + view;
+        halfWay.normalize();
 
+        Vec3 specular = powf(hit.normal.dot(halfWay), mat.specular);
+
+        // shadow value
         float shadowValue = shootShadowRays(light, hit.position);
 
-        finalColor += (diffuse + specular) * shadowValue;
+        finalColor += (diffuse + specular); // * shadowValue;
     }
 
     return finalColor;
@@ -148,7 +158,7 @@ auto RayTracer::getHitColor(Hit hit) -> Vec3
  * \return - a [0, 1] value where 0 is completely shaded and 1 is completely
  * lit
  */
-auto RayTracer::shootShadowRays(Light *light, Vec3 pos) -> float
+auto RayTracer::shootShadowRays(std::shared_ptr<Light> light, Vec3 pos) -> float
 {
     Vec3 lightCenterPos = light->getPos();
     Vec3 lightCenterDir = lightCenterPos - pos;
@@ -179,5 +189,5 @@ auto RayTracer::shootShadowRays(Light *light, Vec3 pos) -> float
         }
     }
 
-    return (float)litSources / (float)m_NumShadowRays;
+    return static_cast<float>(litSources) / static_cast<float>(m_NumShadowRays);
 }

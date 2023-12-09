@@ -21,9 +21,4 @@ struct Camera
         this->dir = lookAt - org;
         this->dir.normalize();
     }
-
-    void from_json(const json &j, Camera &c)
-    {
-        std::cout << "camera org: " << j["org"] << std::endl;
-    }
 };

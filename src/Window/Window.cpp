@@ -11,10 +11,11 @@
  * \param width - the initial width of the wimdow
  * \param height - the initial height of the window
  */
-Window::Window(std::string title, unsigned int width, unsigned int height) : m_Title(title)
+Window::Window(std::string title, int width, int height) : m_Title(title)
 {
     // Set Error Callback
-    glfwSetErrorCallback([](int error, const char *description) { printf("Error: %s\n", description); });
+    glfwSetErrorCallback(
+        [](int error, const char *description) { std::cout << "Error: " << description << std::endl; });
 
     // check if GLFW initialized correctly
     if (!glfwInit())
@@ -23,7 +24,7 @@ Window::Window(std::string title, unsigned int width, unsigned int height) : m_T
     }
 
     // create GLFW window and context
-    m_Window = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
+    m_Window = glfwCreateWindow(static_cast<int>(width), static_cast<int>(height), title.c_str(), nullptr, nullptr);
 
     // Set user pointer for window data
     glfwSetWindowUserPointer(m_Window, &m_Data);
@@ -41,7 +42,7 @@ Window::Window(std::string title, unsigned int width, unsigned int height) : m_T
     glfwMakeContextCurrent(m_Window);
     glfwSwapInterval(1);
 
-    glfwGetFramebufferSize(m_Window, (int *)&m_Data.m_FBWidth, (int *)&m_Data.m_FBHeight);
+    glfwGetFramebufferSize(m_Window, &m_Data.m_FBWidth, &m_Data.m_FBHeight);
 
     // Set Input Callbacks
     glfwSetWindowCloseCallback(m_Window, [](GLFWwindow *window) {
@@ -83,7 +84,7 @@ Window::~Window()
  *
  * \return - the <width, height> window size pair
  */
-auto Window::getSize() -> std::pair<unsigned int, unsigned int>
+auto Window::getSize() -> std::pair<int, int>
 {
     return std::make_pair(m_Data.m_Width, m_Data.m_Height);
 }
@@ -94,7 +95,7 @@ auto Window::getSize() -> std::pair<unsigned int, unsigned int>
  *
  * \return - the <width, height> window framebuffer size pair
  */
-auto Window::getFrameBufferSize() -> std::pair<unsigned int, unsigned int>
+auto Window::getFrameBufferSize() -> std::pair<int, int>
 {
     return std::make_pair(m_Data.m_FBWidth, m_Data.m_FBHeight);
 }

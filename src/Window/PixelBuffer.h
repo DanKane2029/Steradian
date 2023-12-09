@@ -17,14 +17,14 @@ struct PixelMetaData
 class PixelBuffer
 {
   public:
-    PixelBuffer(unsigned int width, unsigned int height);
+    PixelBuffer(int width, int height);
     ~PixelBuffer();
 
-    void setPixel(unsigned int x, unsigned int y, Vec3 pixel);
+    void setPixel(int x, int y, Vec3 pixel);
     auto getPixels() -> float *;
 
-    void resizeBuffer(unsigned int width, unsigned int height);
-    auto getSize() -> std::pair<unsigned int, unsigned int>;
+    void resizeBuffer(int width, int height);
+    auto getSize() -> std::pair<int, int>;
 
   private:
     unsigned int m_Width, m_Height;

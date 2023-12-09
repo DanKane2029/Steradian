@@ -1,8 +1,8 @@
 {
 	"ambientLighting": [
 		0.2,
-		0.2,
-		0.2
+		0.4,
+		0.8
 	],
 	"camera": {
 		"org": [
@@ -13,15 +13,15 @@
 		"lookAt": [
 			0,
 			0,
-			-1
+			0
 		]
 	},
 	"materials": {
 		"Red": {
 			"ambient": 0.75,
-			"diffuse": 0.2,
-			"specular": 0.25,
-			"shininess": 3.0,
+			"diffuse": 5.0,
+			"specular": 2.0,
+			"shininess": 2.0,
 			"color": [
 				0.8,
 				0.9,
@@ -31,23 +31,28 @@
 	},
 	"objects": [
 		{
-			"type": "objModel",
-			"path": "/mnt/c/Users/dpk20/Dev/Path_Tracer/res/models/cube.obj",
-			"material": "Red"
+			"type": "sphere",
+			"material": "Red",
+			"center": [
+				0,
+				0,
+				0
+			],
+			"radius": 1
 		}
 	],
 	"lights": [
 		{
 			"type": "point",
 			"pos": [
-				0.5,
-				0.5,
-				1.0
+				0,
+				0,
+				2
 			],
 			"color": [
-				1,
-				1,
-				1
+				0.3,
+				0.4,
+				0.23
 			],
 			"intensity": 0.2,
 			"radius": 1

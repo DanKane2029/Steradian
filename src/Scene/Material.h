@@ -25,4 +25,8 @@ struct Material
     {
         this->color = Vec3(1, 0.33, 0.2);
     }
+
+    Material() : name("default material name")
+    {
+    }
 };

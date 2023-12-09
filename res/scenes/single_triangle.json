@@ -13,7 +13,7 @@
 		"lookAt": [
 			0,
 			0,
-			-1
+			0
 		]
 	},
 	"materials": {
@@ -31,9 +31,23 @@
 	},
 	"objects": [
 		{
-			"type": "objModel",
-			"path": "/mnt/c/Users/dpk20/Dev/Path_Tracer/res/models/cube.obj",
-			"material": "Red"
+			"type": "triangle",
+			"material": "Red",
+			"point0": [
+				-0.5,
+				-0.5,
+				0
+			],
+			"point1": [
+				0.5,
+				-0.5,
+				0
+			],
+			"point2": [
+				0,
+				0.5,
+				0
+			]
 		}
 	],
 	"lights": [
@@ -49,7 +63,7 @@
 				1,
 				1
 			],
-			"intensity": 0.2,
+			"intensity": 0.00001,
 			"radius": 1
 		}
 	]

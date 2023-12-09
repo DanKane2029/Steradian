@@ -15,9 +15,14 @@
 
 auto main() -> int
 {
-    std::cout << "Loading config file..." << std::endl;
+    // Triangle tri(Vec3(-0.5, -0.5, 0), Vec3(0.5, -0.5, 0), Vec3(0, 0.5, 0));
+    // Ray r(Vec3(0, 0, 2), Vec3(-0.00249222224, 0.0079478249, -0.99996531));
+    // Hit hit = tri.rayIntersect(r);
+
+    // load config file
     Config config("/mnt/c/Users/dpk20/Dev/Path_Tracer/res/configs/test_config.json");
 
+    // create window
     Window window("Path Tracer", config.windowWidth, config.windowHeight);
 
     // framebuffer size sometimes different than window size
@@ -26,25 +31,15 @@ auto main() -> int
     window.setPixelBuffer(&pixelBuffer);
 
     // create scene
-    Scene scene("/mnt/c/Users/dpk20/Dev/Path_Tracer/res/scenes/test_scene.json");
-
-    // Material red("Red", Vec3(0.8f, 0.9f, 0.3f), 0.75f, 0.2f, 0.25f, 3.0f);
-    // scene.registerMaterial(&red);
-
-    // ObjModel objModel("/mnt/c/Users/dpk20/Dev/Path_Tracer/res/models/cone.obj");
-    // // ObjModel objModel("/mnt/c/Users/dpk20/Dev/Path_Tracer/res/models/Eagle.obj");
-    // std::vector<std::shared_ptr<SceneObject>> modelObjects = objModel.getSceneObjects();
-    // scene.addObjects(modelObjects, "Red");
-
-    // Camera camera({0.0f, 0.0f, 100.0f}, objModel.getCenterPoint());
-
-    // scene.setAmbientLighting({0.2f, 0.2f, 0.2f});
-
-    // PointLight light({0.5f, 0.5f, 1.0f}, {0.75f, 0.75f, 0.75f}, 0.8f, 0.25f);
-    // scene.addLight(&light);
+    Scene scene("/mnt/c/Users/dpk20/Dev/Path_Tracer/res/scenes/single_sphere.json");
 
     scene.createAcceleratedStructure();
-    // end scene
+
+    for (std::shared_ptr<Light> l : scene.getLightList())
+    {
+        Vec3 p = l->getPos();
+        std::cout << "light pos: " << p.x() << ", " << p.y() << ", " << p.z() << std::endl;
+    }
 
     RayTracer rayTracer(&pixelBuffer, &scene);
 
@@ -53,12 +48,7 @@ auto main() -> int
     std::uniform_real_distribution<float> dist(0.0, 1.0);
 
     // set up thread list for ray shooting
-    std::vector<std::thread> threads(config.numThreads);
-    std::mutex consoleMutex;
-
-    // ray shooting meta data
-    unsigned int totalSampleCount = 0;
-    std::mutex totalSampleCountMutex;
+    std::vector<std::thread> threads;
 
     // application loop
     while (!window.shouldClose())
@@ -68,11 +58,11 @@ auto main() -> int
         unsigned int curHeight = curSize.second;
 
         // initialize threads for ray shooting
-        for (size_t i = 0; i < threads.size(); i++)
+        for (size_t i = 0; i < config.numThreads; i++)
         {
             if (curWidth > 0 && curHeight > 0)
             {
-                threads[i] = std::thread([&]() {
+                threads.emplace_back(std::thread([&]() {
                     double curTime = glfwGetTime();
                     double endingTime = curTime + (1.0F / static_cast<float>(config.fps));
 
@@ -84,7 +74,7 @@ auto main() -> int
                         rayTracer.sampleScene(x, y);
                         curTime = glfwGetTime();
                     }
-                });
+                }));
             }
         }
 

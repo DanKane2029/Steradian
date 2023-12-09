@@ -8,7 +8,7 @@
  * \param width - the number of columns in the pixel buffer
  * \param height - the number of rows in the pixel buffer
  */
-PixelBuffer::PixelBuffer(unsigned int width, unsigned int height)
+PixelBuffer::PixelBuffer(int width, int height)
     : m_Width(width), m_Height(height), m_Buffer(new float[m_Width * m_Height * 3]),
       m_MetaDataBuffer(new PixelMetaData[m_Width * m_Height])
 {
@@ -31,7 +31,7 @@ PixelBuffer::~PixelBuffer()
  * \param y - the height of the pixel to be colored
  * \param color - the color as a Vec3 to set the desired pixel
  */
-void PixelBuffer::setPixel(unsigned int x, unsigned int y, Vec3 color)
+void PixelBuffer::setPixel(int x, int y, Vec3 color)
 {
     unsigned int metaDataIndex = (y * m_Width + x);
     unsigned int index = metaDataIndex * 3;
@@ -70,7 +70,7 @@ auto PixelBuffer::getPixels() -> float *
  * \param width - the new pixel buffer width
  * \param height - the new pixel buffer height
  */
-void PixelBuffer::resizeBuffer(unsigned int width, unsigned int height)
+void PixelBuffer::resizeBuffer(int width, int height)
 {
     m_Width = width, m_Height = height;
     unsigned int size = m_Width * m_Height * 3;
@@ -87,7 +87,7 @@ void PixelBuffer::resizeBuffer(unsigned int width, unsigned int height)
  *
  * \return - the <width, height> pair
  */
-auto PixelBuffer::getSize() -> std::pair<unsigned int, unsigned int>
+auto PixelBuffer::getSize() -> std::pair<int, int>
 {
     return std::make_pair(m_Width, m_Height);
 }

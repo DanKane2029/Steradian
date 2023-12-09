@@ -18,7 +18,7 @@ class RayTracer
     void sampleScene(float x, float y);
     auto shootRay(Ray ray) -> Hit;
     auto getHitColor(Hit hit) -> Vec3;
-    auto shootShadowRays(Light *light, Vec3 pos) -> float;
+    auto shootShadowRays(std::shared_ptr<Light> light, Vec3 pos) -> float;
 
   private:
     unsigned int m_NumShadowRays = 50;

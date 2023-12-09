@@ -31,7 +31,9 @@ struct Vec3
 
     Vec3()
     {
-        v[0] = 0.0f, v[1] = 0.0f, v[2] = 0.0f;
+        v[0] = 0.0f;
+        v[1] = 0.0f;
+        v[2] = 0.0f;
     }
 
     auto x() const -> float
@@ -96,7 +98,9 @@ struct Vec3
 
     inline void operator/=(const Vec3 &vec)
     {
-        v[0] /= vec.v[0], v[1] /= vec.v[1], v[2] /= vec.v[2];
+        v[0] /= vec.v[0];
+        v[1] /= vec.v[1];
+        v[2] /= vec.v[2];
     }
 
     // DOT PRODUCT
@@ -121,7 +125,10 @@ struct Vec3
     // NORMALIZE
     inline void normalize()
     {
-        *this /= length();
+        float length = this->length();
+        v[0] /= length;
+        v[1] /= length;
+        v[2] /= length;
     }
 
     inline friend auto operator<<(std::ostream &os, const Vec3 &v) -> std::ostream &
