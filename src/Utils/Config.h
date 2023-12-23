@@ -13,6 +13,7 @@ class Config
         const std::string windowWidth = "windowWidth";
         const std::string fps = "fps";
         const std::string numThreads = "numThreads";
+        const std::string numChildrenInBVHLeafNodes = "numChildrenInBVHLeafNodes";
     };
     Keywords m_keywrods;
 
@@ -21,6 +22,7 @@ class Config
     int windowWidth{};
     unsigned int fps;
     unsigned int numThreads;
+    unsigned int numChildrenInBVHLeafNodes;
 
   public:
     Config(std::string filePath);

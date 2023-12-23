@@ -27,29 +27,41 @@ void SceneObject::setMaterialName(std::string &name)
  * \param p1 - position of point 1 as a Vec3
  * \param p2 - position of point 2 as a Vec3
  */
-Triangle::Triangle(Vec3 p0, Vec3 p1, Vec3 p2)
+Triangle::Triangle(Vec3 p0, Vec3 p1, Vec3 p2) : point0(p0), point1(p1), point2(p2), hasNormalVertices(false)
 {
-    // assign points
-    m_Points[0] = p0;
-    m_Points[1] = p1;
-    m_Points[2] = p2;
-
     // calculates the smallest of 3 floats
     auto smallest = [](float x, float y, float z) { return std::min(std::min(x, y), z); };
 
     // calculates the largest of 3 floats
     auto largest = [](float x, float y, float z) { return std::max(std::max(x, y), z); };
 
-    // calculate bounding box by finding the min and max x, y, & z coordinates
-    float minX = smallest(m_Points[0].v[0], m_Points[1].v[0], m_Points[2].v[0]);
-    float minY = smallest(m_Points[0].v[1], m_Points[1].v[1], m_Points[2].v[1]);
-    float minZ = smallest(m_Points[0].v[2], m_Points[1].v[2], m_Points[2].v[2]);
+    // calculate the min and max x, y, & z coordinates
+    minX = smallest(point0.x, point1.x, point2.x);
+    minY = smallest(point0.y, point1.y, point2.y);
+    minZ = smallest(point0.z, point1.z, point2.z);
 
-    float maxX = largest(m_Points[0].v[0], m_Points[1].v[0], m_Points[2].v[0]);
-    float maxY = largest(m_Points[0].v[1], m_Points[1].v[1], m_Points[2].v[1]);
-    float maxZ = largest(m_Points[0].v[2], m_Points[1].v[2], m_Points[2].v[2]);
+    maxX = largest(point0.x, point1.x, point2.x);
+    maxY = largest(point0.y, point1.y, point2.y);
+    maxZ = largest(point0.z, point1.z, point2.z);
+}
 
-    m_BoundingBox = BoundingBox(minX, minY, minZ, maxX, maxY, maxZ);
+Triangle::Triangle(Vec3 p0, Vec3 n0, Vec3 p1, Vec3 n1, Vec3 p2, Vec3 n2)
+    : point0(p0), normal0(n0), point1(p1), normal1(n1), point2(p2), normal2(n2), hasNormalVertices(true)
+{
+    // calculates the smallest of 3 floats
+    auto smallest = [](float x, float y, float z) { return std::min(std::min(x, y), z); };
+
+    // calculates the largest of 3 floats
+    auto largest = [](float x, float y, float z) { return std::max(std::max(x, y), z); };
+
+    // calculate the min and max x, y, & z coordinates
+    minX = smallest(point0.x, point1.x, point2.x);
+    minY = smallest(point0.y, point1.y, point2.y);
+    minZ = smallest(point0.z, point1.z, point2.z);
+
+    maxX = largest(point0.x, point1.x, point2.x);
+    maxY = largest(point0.y, point1.y, point2.y);
+    maxZ = largest(point0.z, point1.z, point2.z);
 }
 
 /**
@@ -60,13 +72,39 @@ Triangle::Triangle(Vec3 p0, Vec3 p1, Vec3 p2)
  */
 Vec3 Triangle::getNormal(Vec3 position)
 {
-    Vec3 v1 = m_Points[1] - m_Points[0];
-    Vec3 v2 = m_Points[2] - m_Points[0];
+    if (hasNormalVertices)
+    {
+        Vec3 v1 = point1 - point0;
+        Vec3 v2 = point2 - point0;
 
-    Vec3 normal = v1.cross(v2);
-    normal.normalize();
+        Vec3 normal = v1.cross(v2);
+        normal.normalize();
 
-    return normal;
+        return normal;
+    }
+    else
+    {
+        // barycentric coordinates (u, v, w) for triangle (point0, point1, point2)
+        Vec3 v0 = point1 - point0;
+        Vec3 v1 = point2 - point0;
+        Vec3 v2 = position - point0;
+
+        float d00 = v0.dot(v0);
+        float d01 = v0.dot(v1);
+        float d11 = v1.dot(v1);
+        float d20 = v2.dot(v0);
+        float d21 = v2.dot(v1);
+
+        float denom = d00 * d11 - d01 * d01;
+        float v = (d11 * d20 - d01 * d21) / denom;
+        float w = (d00 * d21 - d01 * d20) / denom;
+        float u = 1.0f - v - w;
+
+        Vec3 normal = (normal0 * u) + (normal1 * v) + (normal2 * w);
+        normal.normalize();
+
+        return normal;
+    }
 }
 
 /**
@@ -85,9 +123,9 @@ auto Triangle::rayIntersect(Ray ray) -> Hit
     Vec3 orig = ray.org;
     Vec3 dir = ray.dir;
 
-    Vec3 v0 = m_Points[0];
-    Vec3 v1 = m_Points[1];
-    Vec3 v2 = m_Points[2];
+    Vec3 v0 = point0;
+    Vec3 v1 = point1;
+    Vec3 v2 = point2;
 
     // vectors for edges sharing V1
     Vec3 e1 = v1 - v0;
@@ -150,22 +188,12 @@ auto Triangle::rayIntersect(Ray ray) -> Hit
  */
 auto Triangle::getCenterPoint() -> Vec3
 {
-    return (m_Points[0] + m_Points[1] + m_Points[2]) / 3.0f;
-}
-
-/**
- * returns the axis aligned bounding box of the triangle
- *
- * \return - the traingle's bounding box
- */
-auto Triangle::getBoundingBox() -> BoundingBox
-{
-    return m_BoundingBox;
+    return (point0 + point1 + point2) / 3.0f;
 }
 
 std::vector<Vec3> Triangle::getPoints()
 {
-    return {m_Points[0], m_Points[1], m_Points[2]};
+    return {point0, point1, point2};
 }
 
 // SPHERE
@@ -178,15 +206,13 @@ std::vector<Vec3> Triangle::getPoints()
  */
 Sphere::Sphere(Vec3 center, float radius) : m_Center(center), m_Radius(radius)
 {
-    float minX = m_Center.v[0] - m_Radius;
-    float minY = m_Center.v[1] - m_Radius;
-    float minZ = m_Center.v[2] - m_Radius;
+    minX = m_Center.x - m_Radius;
+    minY = m_Center.y - m_Radius;
+    minZ = m_Center.z - m_Radius;
 
-    float maxX = m_Center.v[0] + m_Radius;
-    float maxY = m_Center.v[1] + m_Radius;
-    float maxZ = m_Center.v[2] + m_Radius;
-
-    m_BoundingBox = BoundingBox(minX, minY, minZ, maxX, maxY, maxZ);
+    maxX = m_Center.x + m_Radius;
+    maxY = m_Center.y + m_Radius;
+    maxZ = m_Center.z + m_Radius;
 }
 
 /**
@@ -197,7 +223,7 @@ Sphere::Sphere(Vec3 center, float radius) : m_Center(center), m_Radius(radius)
  */
 auto Sphere::getNormal(Vec3 position) -> Vec3
 {
-    Vec3 normal = Vec3(position.v[0] - m_Center.v[0], position.v[1] - m_Center.v[1], position.v[2] - m_Center.v[2]);
+    Vec3 normal = Vec3(position.x - m_Center.x, position.y - m_Center.y, position.z - m_Center.z);
     normal.normalize();
 
     return normal;
@@ -258,14 +284,4 @@ auto Sphere::rayIntersect(Ray ray) -> Hit
 auto Sphere::getCenterPoint() -> Vec3
 {
     return m_Center;
-}
-
-/**
- * returns the sphere's bounding box
- *
- * \return - the sphere's bounding box
- */
-auto Sphere::getBoundingBox() -> BoundingBox
-{
-    return m_BoundingBox;
 }

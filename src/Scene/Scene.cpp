@@ -131,12 +131,16 @@ Scene::Scene(std::string filePath)
     {
         std::string name = it.key();
         json materialData = it.value();
-        float ambient = materialData.at("ambient");
-        float diffuse = materialData.at("diffuse");
-        float specular = materialData.at("specular");
-        float shininess = materialData.at("shininess");
-        std::vector<float> color = materialData.at("color");
-        Material material(name, color, ambient, diffuse, specular, shininess);
+
+        Vec3 ambient = materialData.at("ambient").get<std::vector<float>>();
+        Vec3 diffuse = materialData.at("diffuse").get<std::vector<float>>();
+        Vec3 specular = materialData.at("specular").get<std::vector<float>>();
+
+        float specularExponent = materialData.at("specularExponent");
+        float transparency = materialData.at("transparency");
+        float refraction = materialData.at("refraction");
+
+        Material material(name, ambient, diffuse, specular, specularExponent, transparency, refraction);
         registerMaterial(material);
     }
 
@@ -156,7 +160,19 @@ Scene::Scene(std::string filePath)
             Vec3 point0(object.at("point0").get<std::vector<float>>());
             Vec3 point1(object.at("point1").get<std::vector<float>>());
             Vec3 point2(object.at("point2").get<std::vector<float>>());
-            addObject(std::make_shared<Triangle>(point0, point1, point2), materialId);
+
+            if (object.contains("normal0") && object.contains("normal1") && object.contains("normal2"))
+            {
+                Vec3 normal0(object.at("normal0").get<std::vector<float>>());
+                Vec3 normal1(object.at("normal1").get<std::vector<float>>());
+                Vec3 normal2(object.at("normal2").get<std::vector<float>>());
+
+                addObject(std::make_shared<Triangle>(point0, normal0, point1, normal1, point2, normal2), materialId);
+            }
+            else
+            {
+                addObject(std::make_shared<Triangle>(point0, point1, point2), materialId);
+            }
         }
         else if (type == "sphere")
         {

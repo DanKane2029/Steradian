@@ -8,7 +8,7 @@
 		"org": [
 			0,
 			0,
-			2
+			-400
 		],
 		"lookAt": [
 			0,
@@ -40,24 +40,9 @@
 	},
 	"objects": [
 		{
-			"type": "sphere",
-			"material": "test",
-			"center": [
-				0,
-				0,
-				0
-			],
-			"radius": 1
-		},
-		{
-			"type": "sphere",
-			"material": "test",
-			"center": [
-				1,
-				1,
-				1
-			],
-			"radius": 0.5
+			"type": "objModel",
+			"path": "/mnt/c/Users/dpk20/Dev/Path_Tracer/res/models/Eagle.obj",
+			"material": "test"
 		}
 	],
 	"lights": [

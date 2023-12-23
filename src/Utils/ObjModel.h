@@ -58,4 +58,5 @@ class ObjModel
     auto parseVec3(std::vector<std::string> &vertexData) -> Vec3;
     std::vector<FaceIndices> parseFace(std::vector<std::string> &faceIndices);
     std::vector<Triangle> triangulateFace(std::vector<ObjModel::FaceIndices> faceIndices);
+    Triangle createTriangleFromFaceIndices(FaceIndices fi0, FaceIndices fi1, FaceIndices fi2);
 };

@@ -175,6 +175,31 @@ auto ObjModel::parseFace(std::vector<std::string> &faceIndices) -> std::vector<O
     return faces;
 }
 
+auto ObjModel::createTriangleFromFaceIndices(FaceIndices fi0, FaceIndices fi1, FaceIndices fi2) -> Triangle
+{
+    bool positionsSet = fi0.positionSet && fi0.positionSet && fi2.positionSet;
+    bool normalsSet = fi0.normalSet && fi0.normalSet && fi2.normalSet;
+    bool textureSet = fi0.textureSet && fi0.textureSet && fi2.textureSet;
+
+    Triangle tri;
+
+    if (positionsSet && normalsSet)
+    {
+        tri = Triangle(m_vertexList[fi0.position - 1], m_normalList[fi0.normal - 1], m_vertexList[fi1.position - 1],
+                       m_normalList[fi1.normal - 1], m_vertexList[fi2.position - 1], m_normalList[fi2.normal - 1]);
+    }
+    else if (positionsSet)
+    {
+        tri = Triangle(m_vertexList[fi0.position - 1], m_vertexList[fi1.position - 1], m_vertexList[fi2.position - 1]);
+    }
+    else
+    {
+        throw std::runtime_error(std::string("Error creating triangle from obj mesh!"));
+    }
+
+    return tri;
+}
+
 auto ObjModel::getSceneObjects() -> std::vector<std::shared_ptr<SceneObject>>
 {
     std::vector<std::shared_ptr<SceneObject>> sceneObjectList;
@@ -191,12 +216,7 @@ auto ObjModel::getSceneObjects() -> std::vector<std::shared_ptr<SceneObject>>
         }
         else
         {
-            FaceIndices fi0 = faceIndices[0];
-            FaceIndices fi1 = faceIndices[1];
-            FaceIndices fi2 = faceIndices[2];
-
-            Triangle tri = Triangle(m_vertexList[fi0.position - 1], m_vertexList[fi1.position - 1],
-                                    m_vertexList[fi2.position - 1]);
+            Triangle tri = createTriangleFromFaceIndices(faceIndices[0], faceIndices[1], faceIndices[2]);
 
             sceneObjectList.push_back(std::make_shared<Triangle>(tri));
         }
@@ -210,10 +230,11 @@ auto ObjModel::triangulateFace(std::vector<ObjModel::FaceIndices> faceIndices) -
     FaceIndices start = faceIndices[0];
     std::vector<Triangle> triList;
 
-    for (unsigned int i = 1; i < faceIndices.size() - 1; i++)
+    for (unsigned int i = 1; i < faceIndices.size() - 2; i++)
     {
-        triList.emplace_back(Triangle(m_vertexList[start.position - 1], m_vertexList[faceIndices[i].position - 1],
-                                      m_vertexList[faceIndices[i + 1].position - 1]));
+        Triangle tri = createTriangleFromFaceIndices(start, faceIndices[i], faceIndices[i + 1]);
+
+        triList.emplace_back(tri);
     }
 
     return triList;
@@ -227,6 +248,6 @@ auto ObjModel::getCenterPoint() -> Vec3
         sum = sum + v;
     }
 
-    Vec3 center = sum / m_vertexList.size();
+    Vec3 center = sum / static_cast<float>(m_vertexList.size());
     return center;
 }

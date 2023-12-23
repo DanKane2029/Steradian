@@ -71,4 +71,8 @@ class Scene
     }
 
     void createAcceleratedStructure();
+    std::shared_ptr<BVH> getAccelerationStructure()
+    {
+        return m_AcceleratedStructure;
+    };
 };

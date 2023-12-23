@@ -7,12 +7,12 @@
 	"camera": {
 		"org": [
 			0,
-			0,
-			2
+			10,
+			13
 		],
 		"lookAt": [
 			0,
-			0,
+			10,
 			0
 		]
 	},
@@ -40,33 +40,18 @@
 	},
 	"objects": [
 		{
-			"type": "sphere",
-			"material": "test",
-			"center": [
-				0,
-				0,
-				0
-			],
-			"radius": 1
-		},
-		{
-			"type": "sphere",
-			"material": "test",
-			"center": [
-				1,
-				1,
-				1
-			],
-			"radius": 0.5
+			"type": "objModel",
+			"path": "/mnt/c/Users/dpk20/Dev/Path_Tracer/res/models/man.obj",
+			"material": "test"
 		}
 	],
 	"lights": [
 		{
 			"type": "point",
 			"pos": [
-				1,
-				1,
-				1
+				5,
+				15,
+				5
 			],
 			"color": [
 				0.3,

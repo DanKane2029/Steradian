@@ -2,15 +2,6 @@
 
 #include <cmath>
 
-/**
- * creates a ray tracer that can be used to trace an image of the given
- * scene from the perspective of the camera and writing the image to the
- * pixel buffer
- *
- * \param pixelBuffer - buffer of pixels where the scene image os stored
- * \param scene - the scene to be traced
- * \param camera - the perspective that the image will have of the scene
- */
 RayTracer::RayTracer(PixelBuffer *pixelBuffer, Scene *scene) : m_PixelBuffer(pixelBuffer), m_Scene(scene)
 {
     auto size = m_PixelBuffer->getSize();
@@ -20,17 +11,6 @@ RayTracer::RayTracer(PixelBuffer *pixelBuffer, Scene *scene) : m_PixelBuffer(pix
 
 RayTracer::~RayTracer() = default;
 
-/**
- * shoots one ray into the scene in a random direction within the bounds
- * of the camera and writes the sampled color to the pixel buffer
- *
- * \param x - float value between [0, 1) representing the x position of the
- *			point to sample on the view plane, where 0 is the left most x
- *          value and 1 is the right most x value
- * \param y - float value between [0, 1) representing the y position of the
- *          point to sample on the view plane, where 0 is the bottom most y
- *          value and 1 is the top most y value
- */
 void RayTracer::sampleScene(float x, float y)
 {
     auto size = m_PixelBuffer->getSize();
@@ -84,52 +64,29 @@ void RayTracer::sampleScene(float x, float y)
     }
 }
 
-/**
- * tests if a ray intersects any scene object within a scene
- * TODO: use acceleration structure to speed up intersection test
- *
- * \param ray - the ray that passes through the scene
- * \return - a hit object detailing if the ray hit an object and
- *			other relevant information
- */
 auto RayTracer::shootRay(Ray ray) -> Hit
 {
-    Hit hit;
-
-    for (std::shared_ptr<SceneObject> so : m_Scene->getObjectList())
-    {
-        Hit curHit = so->rayIntersect(ray);
-        if (curHit.isHit && curHit.time < hit.time)
-        {
-            hit = curHit;
-        }
-    }
-
-    return hit;
+    return m_Scene->getAccelerationStructure()->root->rayIntersect(ray);
 }
 
-/**
- * calculates the color of the hit using the Phong reflection model
- * https://en.wikipedia.org/wiki/Phong_reflection_model
- * TODO: add reflections to equation, may requires adding ray as input
- *
- * \param hit - the hit in the scene to color
- * \return - the final color of the hit
- */
 auto RayTracer::getHitColor(Hit hit) -> Vec3
 {
-    Material mat = *(m_Scene->getMaterial(hit.materialName));
+    Material mat = *m_Scene->getMaterial(hit.materialName);
 
     Vec3 finalColor = 0;
 
-    finalColor += m_Scene->getAmbientLighting() * (mat.color * mat.ambient);
+    finalColor += m_Scene->getAmbientLighting() + mat.ambient;
 
     for (std::shared_ptr<Light> light : m_Scene->getLightList())
     {
         // diffuse component
         Vec3 lightDir = light->getPos() - hit.position;
+        float lightDist = lightDir.length();
         lightDir.normalize();
-        Vec3 diffuse = light->getColor() * std::max(lightDir.dot(hit.normal), 0.0f) * mat.diffuse;
+
+        Vec3 lightDiffuse = light->getColor() * light->getIntensity() * (light->getIntensity() / lightDist);
+        Vec3 dotDiffuse = std::max(lightDir.dot(hit.normal), 0.0f);
+        Vec3 diffuse = lightDiffuse * dotDiffuse * mat.diffuse;
 
         // specular component (Jim Blinn)
         Vec3 view = m_Scene->getCamera().org - hit.position;
@@ -138,26 +95,17 @@ auto RayTracer::getHitColor(Hit hit) -> Vec3
         Vec3 halfWay = lightDir + view;
         halfWay.normalize();
 
-        Vec3 specular = powf(hit.normal.dot(halfWay), mat.specular);
+        Vec3 specular = powf(hit.normal.dot(halfWay), mat.specularExponent);
 
         // shadow value
         float shadowValue = shootShadowRays(light, hit.position);
 
-        finalColor += (diffuse + specular); // * shadowValue;
+        finalColor += (diffuse + specular) * shadowValue;
     }
 
     return finalColor;
 }
 
-/**
- * shoots multiple rays from a position to determin how shaded that area is
- * uses monte carlo enstimation to sample rays
- *
- * \param light - the light to test against
- * \param pos - the position that is being shaded
- * \return - a [0, 1] value where 0 is completely shaded and 1 is completely
- * lit
- */
 auto RayTracer::shootShadowRays(std::shared_ptr<Light> light, Vec3 pos) -> float
 {
     Vec3 lightCenterPos = light->getPos();

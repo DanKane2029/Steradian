@@ -5,7 +5,7 @@
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
-Config::Config(std::string filePath) : fps(30), numThreads(1)
+Config::Config(std::string filePath) : fps(30), numThreads(1), numChildrenInBVHLeafNodes(25)
 {
     loadConfig(filePath);
 }
@@ -20,4 +20,5 @@ void Config::loadConfig(std::string filePath)
     windowWidth = data[m_keywrods.windowWidth];
     fps = data[m_keywrods.fps];
     numThreads = data[m_keywrods.numThreads];
+    numChildrenInBVHLeafNodes = data[m_keywrods.numChildrenInBVHLeafNodes];
 }

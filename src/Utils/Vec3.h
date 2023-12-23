@@ -10,130 +10,118 @@ using json = nlohmann::json;
  */
 struct Vec3
 {
-    float v[3]{};
+    float x, y, z;
 
     Vec3(float x, float y, float z)
     {
-        v[0] = x, v[1] = y, v[2] = z;
+        this->x = x;
+        this->y = y;
+        this->z = z;
     }
 
     Vec3(std::vector<float> list)
     {
-        v[0] = list[0];
-        v[1] = list[1];
-        v[2] = list[2];
+        this->x = list[0];
+        this->y = list[1];
+        this->z = list[2];
     }
 
     Vec3(float x)
     {
-        v[0] = x, v[1] = x, v[2] = x;
+        this->x = x;
+        this->y = x;
+        this->z = x;
     }
 
     Vec3()
     {
-        v[0] = 0.0f;
-        v[1] = 0.0f;
-        v[2] = 0.0f;
-    }
-
-    auto x() const -> float
-    {
-        return v[0];
-    }
-
-    auto y() const -> float
-    {
-        return v[1];
-    }
-
-    auto z() const -> float
-    {
-        return v[2];
+        this->x = 0.0f;
+        this->y = 0.0f;
+        this->z = 0.0f;
     }
 
     // ADD
     inline auto operator+(const Vec3 &vec) -> Vec3
     {
-        return {v[0] + vec.v[0], v[1] + vec.v[1], v[2] + vec.v[2]};
+        return {x + vec.x, y + vec.y, z + vec.z};
     }
 
     inline void operator+=(const Vec3 &vec)
     {
-        v[0] += vec.v[0], v[1] += vec.v[1], v[2] += vec.v[2];
+        x += vec.x, y += vec.y, z += vec.z;
     }
 
     // SUBTRACT
     inline auto operator-(const Vec3 &vec) -> Vec3
     {
-        return {v[0] - vec.v[0], v[1] - vec.v[1], v[2] - vec.v[2]};
+        return {x - vec.x, y - vec.y, z - vec.z};
     }
 
     inline void operator-=(const Vec3 &vec)
     {
-        v[0] -= vec.v[0], v[1] -= vec.v[1], v[2] -= vec.v[2];
+        x -= vec.x, y -= vec.y, z -= vec.z;
     }
 
     // MULTIPLY
     inline auto operator*(const Vec3 &vec) -> Vec3
     {
-        return {v[0] * vec.v[0], v[1] * vec.v[1], v[2] * vec.v[2]};
+        return {x * vec.x, y * vec.y, z * vec.z};
     }
 
     inline void operator*=(const Vec3 &vec)
     {
-        v[0] *= vec.v[0], v[1] *= vec.v[1], v[2] *= vec.v[2];
+        x *= vec.x, y *= vec.y, z *= vec.z;
     }
 
     // SCALE
     inline auto operator*(float s) -> Vec3
     {
-        return {v[0] * s, v[1] * s, v[2] * s};
+        return {x * s, y * s, z * s};
     }
 
     // DIVIDE
     inline auto operator/(const Vec3 &vec) -> Vec3
     {
-        return {v[0] / vec.v[0], v[1] / vec.v[1], v[2] / vec.v[2]};
+        return {x / vec.x, y / vec.y, z / vec.z};
     }
 
     inline void operator/=(const Vec3 &vec)
     {
-        v[0] /= vec.v[0];
-        v[1] /= vec.v[1];
-        v[2] /= vec.v[2];
+        x /= vec.x;
+        y /= vec.y;
+        z /= vec.z;
     }
 
     // DOT PRODUCT
     inline auto dot(const Vec3 &vec) -> float
     {
-        return (v[0] * vec.v[0]) + (v[1] * vec.v[1]) + (v[2] * vec.v[2]);
+        return (x * vec.x) + (y * vec.y) + (z * vec.z);
     }
 
     // CROSS PRODUCT
     inline auto cross(const Vec3 &vec) -> Vec3
     {
-        return {v[1] * vec.v[2] - v[2] * vec.v[1], v[2] * vec.v[0] - v[0] * vec.v[2],
-                v[0] * vec.v[1] - v[1] * vec.v[0]};
+        return {y * vec.z - z * vec.y, z * vec.x - x * vec.z, x * vec.y - y * vec.x};
     }
 
     // LENGTH
     inline auto length() -> float
     {
-        return sqrtf((v[0] * v[0]) + (v[1] * v[1]) + (v[2] * v[2]));
+        return sqrtf((x * x) + (y * y) + (z * z));
     }
 
     // NORMALIZE
     inline void normalize()
     {
         float length = this->length();
-        v[0] /= length;
-        v[1] /= length;
-        v[2] /= length;
+        x /= length;
+        y /= length;
+        z /= length;
     }
 
     inline friend auto operator<<(std::ostream &os, const Vec3 &v) -> std::ostream &
     {
-        os << "(" << v.x() << ", " << v.y() << ", " << v.z() << ")";
+        os << "(" << v.x << ", " << v.y << ", " << v.z << ")";
         return os;
     }
 };

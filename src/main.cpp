@@ -7,20 +7,26 @@
 #include "Window/Window.h"
 
 #include <algorithm>
+#include <exception>
 #include <functional>
 #include <iostream>
 #include <memory>
 #include <random>
 #include <thread>
 
-auto main() -> int
+auto main(int argc, char *argv[]) -> int
 {
-    // Triangle tri(Vec3(-0.5, -0.5, 0), Vec3(0.5, -0.5, 0), Vec3(0, 0.5, 0));
-    // Ray r(Vec3(0, 0, 2), Vec3(-0.00249222224, 0.0079478249, -0.99996531));
-    // Hit hit = tri.rayIntersect(r);
+
+    if (argc < 2)
+    {
+        throw std::invalid_argument("Too few arguments! Need config file path and scene file path.");
+    }
+
+    std::string configPath = std::string(argv[1]);
+    std::string scenePath = std::string(argv[2]);
 
     // load config file
-    Config config("/mnt/c/Users/dpk20/Dev/Path_Tracer/res/configs/test_config.json");
+    Config config(configPath);
 
     // create window
     Window window("Path Tracer", config.windowWidth, config.windowHeight);
@@ -31,15 +37,8 @@ auto main() -> int
     window.setPixelBuffer(&pixelBuffer);
 
     // create scene
-    Scene scene("/mnt/c/Users/dpk20/Dev/Path_Tracer/res/scenes/single_sphere.json");
-
+    Scene scene(scenePath);
     scene.createAcceleratedStructure();
-
-    for (std::shared_ptr<Light> l : scene.getLightList())
-    {
-        Vec3 p = l->getPos();
-        std::cout << "light pos: " << p.x() << ", " << p.y() << ", " << p.z() << std::endl;
-    }
 
     RayTracer rayTracer(&pixelBuffer, &scene);
 
@@ -50,6 +49,7 @@ auto main() -> int
     // set up thread list for ray shooting
     std::vector<std::thread> threads;
 
+    std::cout << "app loop" << std::endl;
     // application loop
     while (!window.shouldClose())
     {
@@ -62,7 +62,7 @@ auto main() -> int
         {
             if (curWidth > 0 && curHeight > 0)
             {
-                threads.emplace_back(std::thread([&]() {
+                threads.emplace_back([&]() {
                     double curTime = glfwGetTime();
                     double endingTime = curTime + (1.0F / static_cast<float>(config.fps));
 
@@ -74,7 +74,7 @@ auto main() -> int
                         rayTracer.sampleScene(x, y);
                         curTime = glfwGetTime();
                     }
-                }));
+                });
             }
         }
 

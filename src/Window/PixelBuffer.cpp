@@ -45,9 +45,9 @@ void PixelBuffer::setPixel(int x, int y, Vec3 color)
 
     Vec3 newColor = (oldColor * oldProportion) + (color * newProportion);
 
-    m_Buffer[index] = newColor.v[0];
-    m_Buffer[index + 1] = newColor.v[1];
-    m_Buffer[index + 2] = newColor.v[2];
+    m_Buffer[index] = newColor.x;
+    m_Buffer[index + 1] = newColor.y;
+    m_Buffer[index + 2] = newColor.z;
 
     m_MetaDataBuffer[metaDataIndex].numRaysShot++;
 }
