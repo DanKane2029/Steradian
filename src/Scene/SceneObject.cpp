@@ -65,6 +65,22 @@ Triangle::Triangle(Vec3 p0, Vec3 n0, Vec3 p1, Vec3 n1, Vec3 p2, Vec3 n2)
 }
 
 /**
+ * calculate the area of the triangle defined by points p0, p1, and p2.
+ *
+ * \param p0 - the position of the first point of the triangle
+ * \param p1 - the position of the second point of the triangle
+ * \param p2 - the position of the thrid point of the triangle
+ *
+ */
+float triangleArea(Vec3 p0, Vec3 p1, Vec3 p2)
+{
+    Vec3 v02 = p2 - p0;
+    Vec3 v12 = p2 - p1;
+
+    return v02.cross(v12).length() / 2.0f;
+}
+
+/**
  * calculates the normal of the surface of the triangle
  *
  * \param position - the position on the triangle to calculate the normal of
@@ -72,7 +88,7 @@ Triangle::Triangle(Vec3 p0, Vec3 n0, Vec3 p1, Vec3 n1, Vec3 p2, Vec3 n2)
  */
 Vec3 Triangle::getNormal(Vec3 position)
 {
-    if (hasNormalVertices)
+    if (!hasNormalVertices)
     {
         Vec3 v1 = point1 - point0;
         Vec3 v2 = point2 - point0;
@@ -84,26 +100,19 @@ Vec3 Triangle::getNormal(Vec3 position)
     }
     else
     {
-        // barycentric coordinates (u, v, w) for triangle (point0, point1, point2)
-        Vec3 v0 = point1 - point0;
-        Vec3 v1 = point2 - point0;
-        Vec3 v2 = position - point0;
+        float areaTotal = triangleArea(point0, point1, point2);
+        float area0 = triangleArea(position, point1, point2);
+        float area1 = triangleArea(position, point2, point0);
+        float area2 = triangleArea(position, point0, point1);
 
-        float d00 = v0.dot(v0);
-        float d01 = v0.dot(v1);
-        float d11 = v1.dot(v1);
-        float d20 = v2.dot(v0);
-        float d21 = v2.dot(v1);
+        float weight0 = area0 / areaTotal;
+        float weight1 = area1 / areaTotal;
+        float weight2 = area2 / areaTotal;
 
-        float denom = d00 * d11 - d01 * d01;
-        float v = (d11 * d20 - d01 * d21) / denom;
-        float w = (d00 * d21 - d01 * d20) / denom;
-        float u = 1.0f - v - w;
+        Vec3 interpolatedNormal = (normal0 * weight0) + (normal1 * weight1) + (normal2 * weight2);
+        interpolatedNormal.normalize();
 
-        Vec3 normal = (normal0 * u) + (normal1 * v) + (normal2 * w);
-        normal.normalize();
-
-        return normal;
+        return interpolatedNormal;
     }
 }
 
@@ -171,9 +180,9 @@ auto Triangle::rayIntersect(Ray ray) -> Hit
     {
         hit.isHit = true;
         hit.materialName = m_MaterialName;
-        hit.normal = getNormal(Vec3());
         hit.time = t;
         hit.position = ray.posAt(t);
+        hit.normal = getNormal(hit.position);
 
         return hit;
     }
@@ -191,7 +200,7 @@ auto Triangle::getCenterPoint() -> Vec3
     return (point0 + point1 + point2) / 3.0f;
 }
 
-std::vector<Vec3> Triangle::getPoints()
+auto Triangle::getPoints() -> std::vector<Vec3>
 {
     return {point0, point1, point2};
 }

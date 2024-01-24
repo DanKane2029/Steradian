@@ -24,12 +24,18 @@ auto ObjModel::loadModel(std::string filePath) -> bool
     std::vector<SceneObject> objList;
 
     std::ifstream objFile(filePath.c_str(), std::ios::in);
-
+    int lineCount = 0;
     if (objFile)
     {
         std::string line;
+
         while (std::getline(objFile, line))
         {
+            if (line.empty())
+            {
+                continue;
+            }
+
             std::vector<std::string> splitLine = splitString(line, std::string(" "));
 
             std::string lineType = splitLine[0];
@@ -91,6 +97,10 @@ auto ObjModel::splitString(std::string &inputString, std::string delimiter) -> s
     }
 
     splitString.push_back(inputString.substr(last, inputString.length()));
+
+    splitString.erase(
+        std::remove_if(splitString.begin(), splitString.end(), [](const std::string &s) { return s.empty(); }),
+        splitString.end());
 
     return splitString;
 }

@@ -1,14 +1,14 @@
 {
 	"ambientLighting": [
-		0.2,
-		0.2,
-		0.2
+		0.1,
+		0.1,
+		0.1
 	],
 	"camera": {
 		"org": [
 			0,
 			0,
-			2
+			-2
 		],
 		"lookAt": [
 			0,
@@ -40,54 +40,25 @@
 	},
 	"objects": [
 		{
-			"type": "triangle",
-			"material": "test",
-			"point0": [
-				-0.5,
-				-0.5,
-				0
-			],
-			"point1": [
-				0.5,
-				-0.5,
-				0
-			],
-			"point2": [
-				0,
-				0.5,
-				0
-			],
-			"normal0": [
-				1,
-				0,
-				0
-			],
-			"normal1": [
-				0,
-				1,
-				0
-			],
-			"normal2": [
-				0,
-				0,
-				1
-			]
+			"type": "objModel",
+			"path": "/mnt/c/Users/dpk20/Dev/Path_Tracer/res/models/ball.obj",
+			"material": "test"
 		}
 	],
 	"lights": [
 		{
 			"type": "point",
 			"pos": [
-				0.5,
-				0.5,
-				1.0
+				3,
+				3,
+				-5
 			],
 			"color": [
-				1,
-				1,
-				1
+				0.3,
+				0.3,
+				0.3
 			],
-			"intensity": 0.00001,
+			"intensity": 1.0,
 			"radius": 1
 		}
 	]
