@@ -4,6 +4,7 @@
 #include "Camera.h"
 #include "Hit.h"
 #include "Scene/Scene.h"
+#include "Utils/Config.h"
 #include "Window/PixelBuffer.h"
 
 /**
@@ -22,8 +23,9 @@ class RayTracer
      *
      * \param pixelBuffer The pixel buffer that the ray tracer will write to.
      * \param scene The scene that the ray tracer will shoot rays into.
+     * \param config The configuration object to configure the  ray tracer parameters.
      */
-    RayTracer(PixelBuffer *pixelBuffer, Scene *scene);
+    RayTracer(PixelBuffer *pixelBuffer, Scene *scene, Config &config);
 
     /**
      * \brief Destroys the RayTracer object.

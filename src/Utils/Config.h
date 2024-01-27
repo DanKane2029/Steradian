@@ -14,6 +14,7 @@ class Config
         const std::string fps = "fps";
         const std::string numThreads = "numThreads";
         const std::string numChildrenInBVHLeafNodes = "numChildrenInBVHLeafNodes";
+        const std::string numShadowRays = "numShadowRays";
     };
     Keywords m_keywrods;
 
@@ -23,6 +24,7 @@ class Config
     unsigned int fps;
     unsigned int numThreads;
     unsigned int numChildrenInBVHLeafNodes;
+    unsigned int numShadowRays;
 
   public:
     Config(std::string filePath);

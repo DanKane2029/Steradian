@@ -40,7 +40,7 @@ auto main(int argc, char *argv[]) -> int
     Scene scene(scenePath);
     scene.createAcceleratedStructure();
 
-    RayTracer rayTracer(&pixelBuffer, &scene);
+    RayTracer rayTracer(&pixelBuffer, &scene, config);
 
     // set up thread safe random number generator [0.0, 1.0)
     std::default_random_engine randomGenerator;
@@ -49,7 +49,6 @@ auto main(int argc, char *argv[]) -> int
     // set up thread list for ray shooting
     std::vector<std::thread> threads;
 
-    std::cout << "app loop" << std::endl;
     // application loop
     while (!window.shouldClose())
     {

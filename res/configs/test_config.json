@@ -3,5 +3,6 @@
 	"windowWidth": 800,
 	"fps": 30,
 	"numThreads": 8,
-	"numChildrenInBVHLeafNodes": 25
+	"numChildrenInBVHLeafNodes": 25,
+	"numShadowRays": 50
 }

@@ -21,4 +21,5 @@ void Config::loadConfig(std::string filePath)
     fps = data[m_keywrods.fps];
     numThreads = data[m_keywrods.numThreads];
     numChildrenInBVHLeafNodes = data[m_keywrods.numChildrenInBVHLeafNodes];
+    numShadowRays = data[m_keywrods.numShadowRays];
 }

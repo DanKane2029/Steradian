@@ -1,0 +1,100 @@
+{
+	"ambientLighting": [
+		0.1,
+		0.1,
+		0.1
+	],
+	"camera": {
+		"org": [
+			0,
+			0,
+			2
+		],
+		"lookAt": [
+			0,
+			0,
+			0
+		]
+	},
+	"materials": {
+		"mat1": {
+			"ambient": [
+				0.2,
+				0.0,
+				0.0
+			],
+			"diffuse": [
+				0.7,
+				0.7,
+				0.7
+			],
+			"specular": [
+				0.0,
+				0.6,
+				0.5
+			],
+			"specularExponent": 100.0,
+			"transparency": 0.0,
+			"refraction": 1.0
+		},
+		"mat2": {
+			"ambient": [
+				0.2,
+				0.2,
+				0.0
+			],
+			"diffuse": [
+				0.7,
+				0.7,
+				0.7
+			],
+			"specular": [
+				0.0,
+				0.6,
+				0.5
+			],
+			"specularExponent": 100.0,
+			"transparency": 0.0,
+			"refraction": 1.0
+		}
+	},
+	"objects": [
+		{
+			"type": "sphere",
+			"material": "mat1",
+			"center": [
+				0,
+				0,
+				0
+			],
+			"radius": 1
+		},
+		{
+			"type": "sphere",
+			"material": "mat2",
+			"center": [
+				0.5,
+				0.5,
+				1
+			],
+			"radius": 0.1
+		}
+	],
+	"lights": [
+		{
+			"type": "point",
+			"pos": [
+				3,
+				3,
+				3
+			],
+			"color": [
+				0.3,
+				0.3,
+				0.3
+			],
+			"intensity": 1.0,
+			"radius": 0.1
+		}
+	]
+}

@@ -2,11 +2,13 @@
 
 #include <cmath>
 
-RayTracer::RayTracer(PixelBuffer *pixelBuffer, Scene *scene) : m_PixelBuffer(pixelBuffer), m_Scene(scene)
+RayTracer::RayTracer(PixelBuffer *pixelBuffer, Scene *scene, Config &config)
+    : m_PixelBuffer(pixelBuffer), m_Scene(scene)
 {
     auto size = m_PixelBuffer->getSize();
     m_FovX = atan2f((float)size.first, 2.0f);
     m_FovY = atan2f((float)size.second, 2.0f);
+    m_NumShadowRays = config.numShadowRays;
 }
 
 RayTracer::~RayTracer() = default;
@@ -111,18 +113,22 @@ auto RayTracer::shootShadowRays(std::shared_ptr<Light> light, Vec3 pos) -> float
     Vec3 lightCenterPos = light->getPos();
     Vec3 lightCenterDir = lightCenterPos - pos;
 
-    float rx = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
-    float ry = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+    Vec3 up = lightCenterDir.cross({0.0f, 1.0f, 0.0f});
+    
+    Vec3 u = lightCenterDir.cross(up);
+    u.normalize();
 
-    Vec3 u = lightCenterDir.cross({0.0f, 1.0f, 0.0f});
     Vec3 v = lightCenterDir.cross(u);
+    v.normalize();
 
     unsigned int litSources = 0;
 
     for (unsigned int i = 0; i < m_NumShadowRays; i++)
     {
-        Vec3 lightPos =
-            lightCenterPos + (u * (0.5f - rx) * light->getRadius()) + (v * (0.5f - ry) * light->getRadius());
+        float rx = ((static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.0f) - 1) * light->getRadius();
+        float ry = ((static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.0f) - 1) * light->getRadius();
+
+        Vec3 lightPos = lightCenterPos + (u * rx) + (v * ry);
 
         Vec3 lightDir = lightPos - pos;
         float lightDist = lightDir.length();
