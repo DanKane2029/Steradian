@@ -4,6 +4,7 @@
 #include <string>
 
 #include "PixelBuffer.h"
+#include "RayTracer/RayTracer.h"
 
 /**
  * wrapper for the GLFW window used to display the rendered image
@@ -29,6 +30,7 @@ class Window
     void update();
 
     void setPixelBuffer(PixelBuffer *pixelBuffer);
+    void setRayTracer(RayTracer *rayTracer);
     void pollEvents();
 
   private:
@@ -40,6 +42,7 @@ class Window
         int m_FBWidth = 0, m_FBHeight = 0;
         bool m_Closed = false;
         PixelBuffer *m_PixelBuffer;
+        RayTracer *m_RayTracer;
     };
 
     WindowData m_Data;

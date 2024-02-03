@@ -75,7 +75,7 @@ void Scene::addLight(std::shared_ptr<Light> light)
  */
 void Scene::registerMaterial(Material material)
 {
-    m_MaterialStore[material.name] = material;
+    m_MaterialStore[material.name] = std::make_shared<Material>(material);
 }
 
 /**
@@ -84,7 +84,7 @@ void Scene::registerMaterial(Material material)
  * \param materialName - the name of the desired material
  * \return - a pointer to the desired material
  */
-auto Scene::getMaterial(std::string materialName) -> Material *
+auto Scene::getMaterial(std::string materialName) -> std::shared_ptr<Material>
 {
     auto it = m_MaterialStore.find(materialName);
 
@@ -95,14 +95,12 @@ auto Scene::getMaterial(std::string materialName) -> Material *
     }
     else
     {
-        return &m_MaterialStore.at(materialName);
+        return m_MaterialStore.at(materialName);
     }
 }
 
 /**
  * creates a bounding volume heirarchy to accelerate ray scene intersections
- * TODO: finish function
- *
  */
 void Scene::createAcceleratedStructure()
 {
@@ -139,8 +137,9 @@ Scene::Scene(std::string filePath)
         float specularExponent = materialData.at("specularExponent");
         float transparency = materialData.at("transparency");
         float refraction = materialData.at("refraction");
+        float reflection = materialData.at("reflection");
 
-        Material material(name, ambient, diffuse, specular, specularExponent, transparency, refraction);
+        Material material(name, ambient, diffuse, specular, specularExponent, transparency, refraction, reflection);
         registerMaterial(material);
     }
 

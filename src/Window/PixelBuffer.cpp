@@ -1,4 +1,5 @@
 #include "PixelBuffer.h"
+#include <GLFW/glfw3.h>
 
 #include <iostream>
 
@@ -80,6 +81,14 @@ void PixelBuffer::resizeBuffer(int width, int height)
 
     delete[] m_MetaDataBuffer;
     m_MetaDataBuffer = new PixelMetaData[size];
+
+    clearBuffer();
+}
+
+void PixelBuffer::clearBuffer()
+{
+    std::fill(m_Buffer, m_Buffer + sizeof(m_Buffer), 0);
+    glDrawPixels(m_Width, m_Height, GL_RGB, GL_FLOAT, m_Buffer);
 }
 
 /**

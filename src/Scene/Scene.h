@@ -37,7 +37,7 @@ class Scene
 
     std::vector<std::shared_ptr<SceneObject>> m_ObjectList{};
     std::vector<std::shared_ptr<Light>> m_LightList{};
-    std::unordered_map<std::string, Material> m_MaterialStore{};
+    std::unordered_map<std::string, std::shared_ptr<Material>> m_MaterialStore{};
 
     std::shared_ptr<BVH> m_AcceleratedStructure{};
     Camera m_Camera;
@@ -51,7 +51,7 @@ class Scene
     void addLight(std::shared_ptr<Light> light);
 
     void registerMaterial(Material material);
-    auto getMaterial(std::string materialName) -> Material *;
+    auto getMaterial(std::string materialName) -> std::shared_ptr<Material>;
 
     static Scene loadFromJson(std::string filePath);
 

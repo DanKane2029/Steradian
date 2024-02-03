@@ -253,12 +253,16 @@ auto Sphere::rayIntersect(Ray ray) -> Hit
 
     float tca = l.dot(ray.dir);
     if (tca < 0.0f)
+    {
         return hit;
+    }
 
     float d2 = l.dot(l) - tca * tca;
     float radius2 = m_Radius * m_Radius;
     if (d2 > radius2)
+    {
         return hit;
+    }
 
     float thc = sqrtf(radius2 - d2);
 
@@ -266,14 +270,18 @@ auto Sphere::rayIntersect(Ray ray) -> Hit
     float t1 = tca + thc;
 
     if (t0 > t1)
+    {
         std::swap(t0, t1);
+    }
 
     if (t0 < 0.0f)
     {
         t0 = t1;
         // t0 and t1 are both negative
         if (t0 < 0.0f)
+        {
             return hit;
+        }
     }
 
     hit.isHit = true;

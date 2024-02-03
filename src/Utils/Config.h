@@ -15,6 +15,7 @@ class Config
         const std::string numThreads = "numThreads";
         const std::string numChildrenInBVHLeafNodes = "numChildrenInBVHLeafNodes";
         const std::string numShadowRays = "numShadowRays";
+        const std::string maxRecurseLevel = "maxRecurseLevel";
     };
     Keywords m_keywrods;
 
@@ -25,6 +26,7 @@ class Config
     unsigned int numThreads;
     unsigned int numChildrenInBVHLeafNodes;
     unsigned int numShadowRays;
+    unsigned int maxRecurseLevel;
 
   public:
     Config(std::string filePath);

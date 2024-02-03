@@ -24,6 +24,7 @@ class PixelBuffer
     auto getPixels() -> float *;
 
     void resizeBuffer(int width, int height);
+    void clearBuffer();
     auto getSize() -> std::pair<int, int>;
 
   private:

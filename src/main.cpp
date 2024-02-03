@@ -16,7 +16,6 @@
 
 auto main(int argc, char *argv[]) -> int
 {
-
     if (argc < 2)
     {
         throw std::invalid_argument("Too few arguments! Need config file path and scene file path.");
@@ -41,6 +40,7 @@ auto main(int argc, char *argv[]) -> int
     scene.createAcceleratedStructure();
 
     RayTracer rayTracer(&pixelBuffer, &scene, config);
+    window.setRayTracer(&rayTracer);
 
     // set up thread safe random number generator [0.0, 1.0)
     std::default_random_engine randomGenerator;

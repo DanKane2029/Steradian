@@ -1,4 +1,5 @@
 #pragma once
+#include "RayTracer/Ray.h"
 #include "Utils/Vec3.h"
 #include <string>
 
@@ -54,6 +55,11 @@ struct Hit
      * value is calculated by the ray tracer and stored here to be added to the pixel buffer.
      */
     Vec3 color{};
+
+    /**
+     * \brief The ray that created the hit.
+     */
+    Ray ray;
 
     /**
      * \brief Creates a new Hit object.

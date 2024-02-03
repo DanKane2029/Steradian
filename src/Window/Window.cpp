@@ -66,6 +66,7 @@ Window::Window(std::string title, int width, int height) : m_Title(title)
         data->m_FBHeight = height;
 
         data->m_PixelBuffer->resizeBuffer(width, height);
+        data->m_RayTracer->updateAspectRatio((float)width / (float)height);
 
         glViewport(0, 0, width, height);
     });
@@ -120,6 +121,16 @@ void Window::update()
 void Window::setPixelBuffer(PixelBuffer *pixelBuffer)
 {
     m_Data.m_PixelBuffer = pixelBuffer;
+}
+
+/**
+ * sets the ray tracer that will color the pixels of the window
+ *
+ * \param rayTracer - the ray tracer object that will color the pixels
+ */
+void Window::setRayTracer(RayTracer *rayTracer)
+{
+    m_Data.m_RayTracer = rayTracer;
 }
 
 void Window::pollEvents()

@@ -22,4 +22,5 @@ void Config::loadConfig(std::string filePath)
     numThreads = data[m_keywrods.numThreads];
     numChildrenInBVHLeafNodes = data[m_keywrods.numChildrenInBVHLeafNodes];
     numShadowRays = data[m_keywrods.numShadowRays];
+    maxRecurseLevel = data[m_keywrods.maxRecurseLevel];
 }

@@ -1,14 +1,14 @@
 {
 	"ambientLighting": [
-		0.1,
-		0.1,
-		0.1
+		0.2,
+		0.0,
+		0.0
 	],
 	"camera": {
 		"org": [
 			0,
 			0,
-			2
+			2.5
 		],
 		"lookAt": [
 			0,
@@ -19,23 +19,24 @@
 	"materials": {
 		"mat1": {
 			"ambient": [
-				0.2,
 				0.0,
-				0.0
+				0.2,
+				0.2
 			],
 			"diffuse": [
-				0.7,
-				0.7,
-				0.7
+				0.3,
+				0.3,
+				0.3
 			],
 			"specular": [
-				0.0,
-				0.6,
-				0.5
+				0.2,
+				0.2,
+				0.2
 			],
-			"specularExponent": 100.0,
+			"specularExponent": 50,
 			"transparency": 0.0,
-			"refraction": 1.0
+			"refraction": 0.0,
+			"reflection": 0.5
 		},
 		"mat2": {
 			"ambient": [
@@ -44,18 +45,19 @@
 				0.0
 			],
 			"diffuse": [
-				0.7,
-				0.7,
-				0.7
+				1.0,
+				1.0,
+				1.0
 			],
 			"specular": [
-				0.0,
-				0.6,
-				0.5
+				0.2,
+				0.2,
+				0.2
 			],
-			"specularExponent": 100.0,
+			"specularExponent": 100,
 			"transparency": 0.0,
-			"refraction": 1.0
+			"refraction": 0.0,
+			"reflection": 1.0
 		}
 	},
 	"objects": [
@@ -63,7 +65,7 @@
 			"type": "sphere",
 			"material": "mat1",
 			"center": [
-				0,
+				-1,
 				0,
 				0
 			],
@@ -73,11 +75,11 @@
 			"type": "sphere",
 			"material": "mat2",
 			"center": [
-				0.5,
-				0.5,
-				1
+				1,
+				0,
+				0
 			],
-			"radius": 0.1
+			"radius": 1
 		}
 	],
 	"lights": [

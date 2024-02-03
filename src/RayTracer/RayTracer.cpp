@@ -8,10 +8,19 @@ RayTracer::RayTracer(PixelBuffer *pixelBuffer, Scene *scene, Config &config)
     auto size = m_PixelBuffer->getSize();
     m_FovX = atan2f((float)size.first, 2.0f);
     m_FovY = atan2f((float)size.second, 2.0f);
+    m_aspectRatio = (float)size.first / (float)size.second;
     m_NumShadowRays = config.numShadowRays;
+    m_MaxRecurseLevel = config.maxRecurseLevel;
+    vx = tanf(m_FovX / 2.0f);
+    vy = tanf(m_FovY / 2.0f);
 }
 
 RayTracer::~RayTracer() = default;
+
+void RayTracer::updateAspectRatio(float aspectRatio)
+{
+    m_aspectRatio = aspectRatio;
+}
 
 void RayTracer::sampleScene(float x, float y)
 {
@@ -22,18 +31,23 @@ void RayTracer::sampleScene(float x, float y)
     Camera camera = m_Scene->getCamera();
 
     // find perpendicular vectors to the camera look direction vector
-    Vec3 vx = camera.dir.cross(Vec3(0.0f, 1.0f, 0.0f));
-    Vec3 vy = vx.cross(camera.dir);
+    // Vec3 vx = camera.dir.cross(Vec3(0.0f, 1.0f, 0.0f));
+    // Vec3 vy = vx.cross(camera.dir);
 
-    // calculate height and width of a single pixel on the view plane
-    float pixelWidth = 2.0f * tan(m_FovX / 2.0f) / width;
-    float pixelHeight = 2.0f * tan(m_FovY / 2.0f) / height;
+    // // calculate height and width of a single pixel on the view plane
+    // float pixelWidth = 2.0f * tan(m_FovX / 2.0f) / width;
+    // float pixelHeight = 2.0f * tan(m_FovY / 2.0f) / height;
 
-    // get the position of the bottom left point on the view plane
-    Vec3 p0 = camera.org + camera.dir - (vy * pixelHeight * (height / 2.0f)) - (vx * pixelWidth * (width / 2.0f));
+    // // get the position of the bottom left point on the view plane
+    // Vec3 p0 = camera.org + camera.dir - (vy * pixelHeight * (height / 2.0f)) - (vx * pixelWidth * (width / 2.0f));
 
-    // calculate the position of the sampled point on the view plane
-    Vec3 pij = p0 + (vx * pixelWidth * x * width) + (vy * pixelHeight * y * height);
+    // // calculate the position of the sampled point on the view plane
+    // Vec3 pij = p0 + (vx * pixelWidth * x * width) + (vy * pixelHeight * y * height);
+
+    float worldX = ((x * 2.0f) - 1.0f) * vx * m_aspectRatio;
+    float worldY = ((y * 2.0f) - 1.0f) * vy;
+
+    Vec3 pij = (camera.org + camera.dir) + Vec3(worldX, worldY, 0.0f);
 
     // get the direction from camera origin to the sampled point
     Vec3 dir = pij - camera.org;
@@ -42,11 +56,13 @@ void RayTracer::sampleScene(float x, float y)
     // create ray that will start at the camera origin and pass through the
     // sampled point on the view plane
     Ray ray(camera.org, dir);
+
     Hit hit = shootRay(ray);
 
     if (hit.isHit)
     {
-        Vec3 color = getHitColor(hit);
+        unsigned int recurseLevel = 0;
+        Vec3 color = getHitColor(hit, recurseLevel);
 
         int ix = static_cast<int>(floorf(static_cast<float>(size.first - 1) * x));
         int iy = static_cast<int>(floorf(static_cast<float>(size.second - 1) * y));
@@ -68,11 +84,18 @@ void RayTracer::sampleScene(float x, float y)
 
 auto RayTracer::shootRay(Ray ray) -> Hit
 {
-    return m_Scene->getAccelerationStructure()->root->rayIntersect(ray);
+    Hit hit = m_Scene->getAccelerationStructure()->root->rayIntersect(ray);
+    hit.ray = ray;
+    return hit;
 }
 
-auto RayTracer::getHitColor(Hit hit) -> Vec3
+auto RayTracer::getHitColor(Hit hit, unsigned int recurseLevel) -> Vec3
 {
+    if (recurseLevel > m_MaxRecurseLevel)
+    {
+        return Vec3{};
+    }
+
     Material mat = *m_Scene->getMaterial(hit.materialName);
 
     Vec3 finalColor = 0;
@@ -97,12 +120,24 @@ auto RayTracer::getHitColor(Hit hit) -> Vec3
         Vec3 halfWay = lightDir + view;
         halfWay.normalize();
 
-        Vec3 specular = powf(hit.normal.dot(halfWay), mat.specularExponent);
+        Vec3 specular = mat.specular * powf(hit.normal.dot(halfWay), mat.specularExponent);
 
         // shadow value
         float shadowValue = shootShadowRays(light, hit.position);
 
-        finalColor += (diffuse + specular) * shadowValue;
+        finalColor += (diffuse + specular) * shadowValue * (1.0f - mat.reflection);
+
+        if (mat.reflection > 0)
+        {
+            Ray reflectedRay = hit.ray.getReflectionRay(hit.position, hit.normal);
+            Hit reflectionHit = shootRay(reflectedRay);
+
+            if (reflectionHit.isHit)
+            {
+                Vec3 reflectionColor = getHitColor(reflectionHit, ++recurseLevel);
+                finalColor += reflectionColor * mat.reflection;
+            }
+        }
     }
 
     return finalColor;
@@ -114,7 +149,7 @@ auto RayTracer::shootShadowRays(std::shared_ptr<Light> light, Vec3 pos) -> float
     Vec3 lightCenterDir = lightCenterPos - pos;
 
     Vec3 up = lightCenterDir.cross({0.0f, 1.0f, 0.0f});
-    
+
     Vec3 u = lightCenterDir.cross(up);
     u.normalize();
 

@@ -36,6 +36,10 @@ struct Ray
         this->dir.normalize();
     }
 
+    Ray() : org(Vec3()), dir(Vec3(0, 0, 1))
+    {
+    }
+
     /**
      * \brief Gets the position along a ray.
      *
@@ -46,5 +50,16 @@ struct Ray
     auto posAt(float t) -> Vec3
     {
         return org + (dir * t);
+    }
+
+    /**
+     * \brief Reflects the ray based on the hit position and normal.
+     */
+    Ray getReflectionRay(Vec3 pos, Vec3 normal)
+    {
+        Vec3 reverseDir = dir * -1.0f;
+        float revNDot = reverseDir.dot(normal);
+        Vec3 reflectedDir = (normal * 2.0f * revNDot) - reverseDir;
+        return Ray(pos, reflectedDir);
     }
 };

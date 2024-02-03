@@ -18,11 +18,12 @@ struct Material
     float specularExponent;
     float transparency;
     float refraction;
+    float reflection;
 
     Material(std::string name, Vec3 ambient, Vec3 diffuse, Vec3 specular, float specularExponent, float transparency,
-             float refraction)
+             float refraction, float reflection)
         : name(std::move(name)), ambient(ambient), diffuse(diffuse), specular(specular),
-          specularExponent(specularExponent), transparency(transparency), refraction(refraction)
+          specularExponent(specularExponent), transparency(transparency), refraction(refraction), reflection(reflection)
     {
     }
 

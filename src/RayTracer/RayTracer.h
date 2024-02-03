@@ -63,9 +63,10 @@ class RayTracer
      * always be true.
      *
      * \param hit The hit to calculate the color of.
+     * \param recurseLevel The current level of recursion used for reflection calculations.
      * \returns The color of the hit as a Vector3.
      */
-    auto getHitColor(Hit hit) -> Vec3;
+    auto getHitColor(Hit hit, unsigned int recurseLevel) -> Vec3;
 
     /**
      * \brief Calculates if the position is in a shadow.
@@ -79,14 +80,21 @@ class RayTracer
      */
     auto shootShadowRays(std::shared_ptr<Light> light, Vec3 pos) -> float;
 
+    void updateAspectRatio(float aspectRatio);
+
   private:
     unsigned int m_NumShadowRays = 5;
     unsigned int m_ReflectionLimit = 100;
+    unsigned int m_MaxRecurseLevel = 10;
 
     float m_FovX{}, m_FovY{};
+    float m_aspectRatio;
     Camera m_Camera;
 
     Scene *m_Scene{};
     PixelBuffer *m_PixelBuffer{};
     std::mutex m_PixelBufferGuard;
+
+    float vx;
+    float vy;
 };
