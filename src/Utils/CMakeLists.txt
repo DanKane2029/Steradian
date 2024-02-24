@@ -1,6 +1,6 @@
 set(LIBRARY_NAME UTILS)
 
-set(HEADERS Vec3.h Config.h ObjModel.h)
+set(HEADERS Vec3.h Config.h ObjModel.h stb_image.h StringUtils.h)
 set(SOURCES Config.cpp ObjModel.cpp)
 
 message(${CMAKE_SOURCE_DIR}/third_party/json/include)

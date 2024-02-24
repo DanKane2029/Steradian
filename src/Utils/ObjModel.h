@@ -54,7 +54,6 @@ class ObjModel
 
   private:
     auto loadModel(std::string filePath) -> bool;
-    std::vector<std::string> splitString(std::string &inputString, std::string delimiter);
     auto parseVec3(std::vector<std::string> &vertexData) -> Vec3;
     std::vector<FaceIndices> parseFace(std::vector<std::string> &faceIndices);
     std::vector<Triangle> triangulateFace(std::vector<ObjModel::FaceIndices> faceIndices);

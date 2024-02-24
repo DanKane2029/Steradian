@@ -14,12 +14,17 @@
 #include <random>
 #include <thread>
 
+#include "Scene/Texture.h"
+
 auto main(int argc, char *argv[]) -> int
 {
     if (argc < 2)
     {
         throw std::invalid_argument("Too few arguments! Need config file path and scene file path.");
     }
+
+    std::string texPath = "/mnt/c/Users/dpk20/Dev/Path_Tracer/res/textures/checkered.png";
+    Texture testTex(texPath);
 
     std::string configPath = std::string(argv[1]);
     std::string scenePath = std::string(argv[2]);
