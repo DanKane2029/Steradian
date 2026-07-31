@@ -1,5 +1,5 @@
-# build output
-build/
+# build output (any build* directory: build/, build-viewer/, build-asan/, ...)
+build*/
 bin
 lib
 x64

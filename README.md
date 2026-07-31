@@ -23,10 +23,25 @@ on inlining small vector operations, so an unoptimized build is dramatically slo
 
 ### Optional viewer
 
-The interactive GLFW viewer needs OpenGL and X11 development headers
-(`libgl1-mesa-dev`, `xorg-dev` on Debian/Ubuntu). If they are not present, CMake prints a
-warning and builds a **headless-only** binary instead of failing. To skip the viewer
-explicitly:
+The interactive GLFW viewer needs OpenGL and X11 development headers. If they are not
+present, CMake prints a warning and builds a **headless-only** binary instead of failing.
+
+```sh
+sudo apt install libgl1-mesa-dev xorg-dev
+```
+
+Without sudo, `scripts/setup-deps.sh` fetches the same `-dev` packages with
+`apt-get download` (no privileges needed), unpacks them into `~/.local/sysroot`, and
+points the development symlinks at the runtime libraries already installed system-wide:
+
+```sh
+scripts/setup-deps.sh
+cmake -B build -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_PREFIX_PATH="$HOME/.local/sysroot/usr" \
+    -DCMAKE_LIBRARY_PATH="$HOME/.local/sysroot/usr/lib/x86_64-linux-gnu"
+```
+
+To skip the viewer entirely:
 
 ```sh
 cmake -B build -DPT_BUILD_VIEWER=OFF
