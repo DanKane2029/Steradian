@@ -3,6 +3,7 @@
 #include "Utils/Config.h"
 #include "Utils/ImageIO.h"
 #include "Utils/Random.h"
+#include "Utils/Stats.h"
 #include "Window/PixelBuffer.h"
 
 #ifdef PT_HAVE_VIEWER
@@ -241,8 +242,23 @@ auto main(int argc, char *argv[]) -> int
             const double samples = static_cast<double>(config.windowWidth) * static_cast<double>(config.windowHeight) *
                                    static_cast<double>(options.samplesPerPixel);
 
-            std::cout << "Rendered in " << seconds << " s (" << (samples / seconds / 1e6)
-                      << " M primary samples/sec)" << std::endl;
+            std::cout << "Rendered in " << seconds << " s (" << (samples / seconds / 1e6) << " M primary samples/sec)"
+                      << std::endl;
+
+            if (Stats::enabled())
+            {
+                const Stats::Counters counters = Stats::total();
+                const auto perRay = [&](uint64_t n) {
+                    return (counters.rays > 0) ? static_cast<double>(n) / static_cast<double>(counters.rays) : 0.0;
+                };
+
+                std::cout << "  rays traced      " << counters.rays << " (" << (counters.rays / seconds / 1e6)
+                          << " M/s)\n"
+                          << "  node visits      " << counters.nodeVisits << " (" << perRay(counters.nodeVisits)
+                          << " per ray)\n"
+                          << "  primitive tests  " << counters.primitiveTests << " (" << perRay(counters.primitiveTests)
+                          << " per ray)" << std::endl;
+            }
 
             if (!options.outputPath.empty())
             {

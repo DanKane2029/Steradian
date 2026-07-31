@@ -1,5 +1,7 @@
 #include "RayTracer.h"
 
+#include "Utils/Stats.h"
+
 #include <cmath>
 #include <cstdint>
 
@@ -90,6 +92,10 @@ void RayTracer::renderRows(int yStart, int yEnd, unsigned int samplesPerPixel, u
     auto size = m_PixelBuffer->getSize();
     const int width = size.first;
 
+    // Counters are thread-local while rendering and merged once at the end, so the hot
+    // path stays lock-free.
+    Stats::resetThread();
+
     for (int iy = yStart; iy < yEnd; iy++)
     {
         // Seeding per row rather than per thread is what makes the output independent
@@ -107,10 +113,14 @@ void RayTracer::renderRows(int yStart, int yEnd, unsigned int samplesPerPixel, u
             }
         }
     }
+
+    Stats::mergeThread();
 }
 
 auto RayTracer::shootRay(Ray ray) -> Hit
 {
+    Stats::countRay();
+
     Hit hit = m_Scene->getAccelerationStructure()->root->rayIntersect(ray);
     hit.ray = ray;
     return hit;

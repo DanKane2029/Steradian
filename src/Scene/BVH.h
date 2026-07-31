@@ -8,6 +8,7 @@
 
 #include "BoundingBox.h"
 #include "SceneObject.h"
+#include "Utils/Stats.h"
 
 struct BVHNode
 {
@@ -24,10 +25,13 @@ struct BVHNode
     {
         Hit hit;
 
+        Stats::countNodeVisit();
+
         if (isLeaf)
         {
             for (std::shared_ptr<SceneObject> so : sceneObjects)
             {
+                Stats::countPrimitiveTest();
                 Hit curHit = so->rayIntersect(ray);
                 if (curHit.isHit && hit.time > curHit.time)
                 {
