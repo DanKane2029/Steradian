@@ -1,11 +1,40 @@
-# Path_Tracer
+# Steradian
 
 A from-scratch CPU renderer in C++.
 
-> **Status:** despite the project name, the renderer currently implements a **Whitted-style
-> ray tracer** with a Blinn-Phong direct lighting model, mirror reflections and stochastic
-> soft shadows. There is no Monte Carlo path integral and no global illumination yet —
-> converting the integrator is planned work, and this note will be updated when it lands.
+Named for the SI unit of solid angle — integrating incoming radiance over the hemisphere
+above a surface is the thing the renderer is being built to do.
+
+> **Status: not yet a path tracer.** Today the renderer is **Whitted-style**: Blinn-Phong
+> direct lighting, perfect-mirror reflections and stochastic soft shadows. There is no
+> Monte Carlo path integral, no BRDF importance sampling and no global illumination. The
+> roadmap below tracks the work to get there, and this note will change when it lands.
+
+## Roadmap
+
+| Stage | Goal | State |
+| --- | --- | --- |
+| 0 | Build and run reproducibly; headless PNG output; deterministic seeding | done |
+| 1 | Golden-image regression tests, CI, BVH/ray instrumentation | in progress |
+| 2 | Correctness pass: camera basis and real FOV, ray epsilons, OBJ triangulation, textures | planned |
+| 3 | Performance: flat SAH BVH that actually culls, typed primitive arrays, slim hit record, thread pool | planned |
+| 4 | Replace the integrator with Monte Carlo path tracing: hemisphere sampling, BSDFs, area lights, tonemapping | planned |
+
+### Known issues being worked through
+
+These are real and measured, not speculative:
+
+- **The acceleration structure performs no culling.** Traversal descends into every node and
+  tests every primitive; the bounding-box test exists but is never called. Render time scales
+  *linearly* with primitive count — 960 triangles takes 0.27 s where 24,459 takes 6.23 s at
+  the same settings.
+- **The OBJ loader drops geometry.** Fan triangulation is off by one, so every n-gon loses its
+  last triangle. `man.obj` is entirely quads and loads as 24,459 triangles where 48,918 is
+  correct — half the mesh is missing.
+- **The camera ignores its own orientation.** Film offsets are applied in world XY, and the
+  field of view is derived from the pixel count rather than the scene, so it only behaves
+  looking along ±Z and aspect ratio is applied twice.
+- **Secondary rays have no epsilon**, producing visible shadow acne.
 
 ## Building
 
@@ -56,11 +85,11 @@ cmake -B build -DPT_BUILD_VIEWER=OFF
 
 ```sh
 # interactive viewer
-./build/src/path_tracer --config res/configs/test_config.json \
+./build/src/steradian --config res/configs/test_config.json \
                         --scene  res/scenes/two_spheres.json
 
 # headless render to a PNG
-./build/src/path_tracer --config res/configs/test_config.json \
+./build/src/steradian --config res/configs/test_config.json \
                         --scene  res/scenes/two_spheres.json \
                         --out    render.png --samples 64 --seed 1
 ```

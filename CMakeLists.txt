@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(path_tracer LANGUAGES CXX)
+project(steradian LANGUAGES CXX)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -60,6 +60,6 @@ endif()
 
 add_subdirectory(src)
 
-message(STATUS "path_tracer: build type  = ${CMAKE_BUILD_TYPE}")
-message(STATUS "path_tracer: viewer      = ${PT_VIEWER_ENABLED}")
-message(STATUS "path_tracer: native arch = ${PT_NATIVE_ARCH}")
+message(STATUS "steradian: build type  = ${CMAKE_BUILD_TYPE}")
+message(STATUS "steradian: viewer      = ${PT_VIEWER_ENABLED}")
+message(STATUS "steradian: native arch = ${PT_NATIVE_ARCH}")

@@ -3,8 +3,8 @@ build*/
 bin
 lib
 x64
-path_tracer
-path_tracer.dir
+steradian
+steradian.dir
 *.a
 *.o
 

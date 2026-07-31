@@ -24,8 +24,8 @@ target_link_libraries(pt_core
     PRIVATE pt_warnings
 )
 
-add_executable(path_tracer main.cpp)
-target_link_libraries(path_tracer PRIVATE pt_core pt_warnings)
+add_executable(steradian main.cpp)
+target_link_libraries(steradian PRIVATE pt_core pt_warnings)
 
 if(PT_VIEWER_ENABLED)
     add_library(pt_viewer STATIC Window/Window.cpp)
@@ -33,6 +33,6 @@ if(PT_VIEWER_ENABLED)
         PUBLIC pt_core glfw OpenGL::GL
         PRIVATE pt_warnings
     )
-    target_link_libraries(path_tracer PRIVATE pt_viewer)
-    target_compile_definitions(path_tracer PRIVATE PT_HAVE_VIEWER)
+    target_link_libraries(steradian PRIVATE pt_viewer)
+    target_compile_definitions(steradian PRIVATE PT_HAVE_VIEWER)
 endif()
