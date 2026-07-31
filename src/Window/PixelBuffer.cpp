@@ -1,7 +1,6 @@
 #include "PixelBuffer.h"
-#include <GLFW/glfw3.h>
 
-#include <iostream>
+#include <algorithm>
 
 /**
  * creates a pixel buffer object of a given width and height
@@ -10,8 +9,8 @@
  * \param height - the number of rows in the pixel buffer
  */
 PixelBuffer::PixelBuffer(int width, int height)
-    : m_Width(width), m_Height(height), m_Buffer(new float[m_Width * m_Height * 3]),
-      m_MetaDataBuffer(new PixelMetaData[m_Width * m_Height])
+    : m_Width(width), m_Height(height), m_Buffer(new float[numColorComponents()]()),
+      m_MetaDataBuffer(new PixelMetaData[numPixels()])
 {
 }
 
@@ -28,29 +27,38 @@ PixelBuffer::~PixelBuffer()
  * sets the color of a single pixel in the buffer
  * if a pixel is set/colored multiple times the colors are averaged
  *
+ * This performs an unsynchronized read-modify-write, so callers must guarantee a given
+ * pixel is only ever written by one thread at a time. The renderer does this by giving
+ * each worker thread an exclusive band of rows.
+ *
  * \param x - the width of the pixel to be colored
  * \param y - the height of the pixel to be colored
  * \param color - the color as a Vec3 to set the desired pixel
  */
 void PixelBuffer::setPixel(int x, int y, Vec3 color)
 {
-    unsigned int metaDataIndex = (y * m_Width + x);
-    unsigned int index = metaDataIndex * 3;
-    Vec3 oldColor = Vec3(m_Buffer[index], m_Buffer[index + 1], m_Buffer[index + 2]);
+    if (x < 0 || y < 0 || static_cast<unsigned int>(x) >= m_Width || static_cast<unsigned int>(y) >= m_Height)
+    {
+        return;
+    }
 
-    unsigned int numRaysShot = m_MetaDataBuffer[metaDataIndex].numRaysShot;
-    unsigned int newNumRaysShot = numRaysShot + 1;
+    const unsigned int metaDataIndex = (static_cast<unsigned int>(y) * m_Width) + static_cast<unsigned int>(x);
+    const unsigned int index = metaDataIndex * 3;
 
-    float oldProportion = (float)numRaysShot / (float)(numRaysShot + 1.0f);
-    float newProportion = 1.0f / (float)(numRaysShot + 1.0f);
+    const Vec3 oldColor = Vec3(m_Buffer[index], m_Buffer[index + 1], m_Buffer[index + 2]);
 
-    Vec3 newColor = (oldColor * oldProportion) + (color * newProportion);
+    const unsigned int numRaysShot = m_MetaDataBuffer[metaDataIndex].numRaysShot;
+
+    const float oldProportion = static_cast<float>(numRaysShot) / static_cast<float>(numRaysShot + 1);
+    const float newProportion = 1.0f / static_cast<float>(numRaysShot + 1);
+
+    const Vec3 newColor = (oldColor * oldProportion) + (color * newProportion);
 
     m_Buffer[index] = newColor.x;
     m_Buffer[index + 1] = newColor.y;
     m_Buffer[index + 2] = newColor.z;
 
-    m_MetaDataBuffer[metaDataIndex].numRaysShot++;
+    m_MetaDataBuffer[metaDataIndex].numRaysShot = numRaysShot + 1;
 }
 
 /**
@@ -73,22 +81,23 @@ auto PixelBuffer::getPixels() -> float *
  */
 void PixelBuffer::resizeBuffer(int width, int height)
 {
-    m_Width = width, m_Height = height;
-    unsigned int size = m_Width * m_Height * 3;
+    m_Width = width;
+    m_Height = height;
 
     delete[] m_Buffer;
-    m_Buffer = new float[size];
+    m_Buffer = new float[numColorComponents()]();
 
     delete[] m_MetaDataBuffer;
-    m_MetaDataBuffer = new PixelMetaData[size];
-
-    clearBuffer();
+    m_MetaDataBuffer = new PixelMetaData[numPixels()];
 }
 
+/**
+ * resets all accumulated color and sample counts to zero
+ */
 void PixelBuffer::clearBuffer()
 {
-    std::fill(m_Buffer, m_Buffer + sizeof(m_Buffer), 0);
-    glDrawPixels(m_Width, m_Height, GL_RGB, GL_FLOAT, m_Buffer);
+    std::fill(m_Buffer, m_Buffer + numColorComponents(), 0.0f);
+    std::fill(m_MetaDataBuffer, m_MetaDataBuffer + numPixels(), PixelMetaData{});
 }
 
 /**
@@ -98,5 +107,5 @@ void PixelBuffer::clearBuffer()
  */
 auto PixelBuffer::getSize() -> std::pair<int, int>
 {
-    return std::make_pair(m_Width, m_Height);
+    return std::make_pair(static_cast<int>(m_Width), static_cast<int>(m_Height));
 }

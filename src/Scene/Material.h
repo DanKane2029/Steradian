@@ -15,10 +15,14 @@ struct Material
     Vec3 ambient;
     Vec3 diffuse;
     Vec3 specular;
-    float specularExponent;
-    float transparency;
-    float refraction;
-    float reflection;
+
+    // Defaulted here rather than in each constructor. The shading code branches on
+    // `reflection` and scales by it, so leaving these indeterminate in the shorter
+    // constructors was undefined behaviour that showed up as random reflections.
+    float specularExponent = 1.0f;
+    float transparency = 0.0f;
+    float refraction = 1.0f;
+    float reflection = 0.0f;
 
     Material(std::string name, Vec3 ambient, Vec3 diffuse, Vec3 specular, float specularExponent, float transparency,
              float refraction, float reflection)

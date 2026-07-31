@@ -1,5 +1,6 @@
 #pragma once
-#include <memory>
+#include <cstddef>
+#include <utility>
 
 #include "Utils/Vec3.h"
 
@@ -28,6 +29,18 @@ class PixelBuffer
     auto getSize() -> std::pair<int, int>;
 
   private:
+    /** number of pixels in the buffer */
+    auto numPixels() const -> size_t
+    {
+        return static_cast<size_t>(m_Width) * static_cast<size_t>(m_Height);
+    }
+
+    /** number of float components in the color buffer (3 per pixel) */
+    auto numColorComponents() const -> size_t
+    {
+        return numPixels() * 3;
+    }
+
     unsigned int m_Width, m_Height;
 
     float *m_Buffer;

@@ -41,7 +41,7 @@
 	"objects": [
 		{
 			"type": "objModel",
-			"path": "/mnt/c/Users/dpk20/Dev/Path_Tracer/res/models/Eagle.obj",
+			"path": "../models/Eagle.obj",
 			"material": "test"
 		}
 	],

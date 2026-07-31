@@ -41,7 +41,7 @@ struct Vec3
     }
 
     // ADD
-    inline auto operator+(const Vec3 &vec) -> Vec3
+    inline auto operator+(const Vec3 &vec) const -> Vec3
     {
         return {x + vec.x, y + vec.y, z + vec.z};
     }
@@ -52,7 +52,7 @@ struct Vec3
     }
 
     // SUBTRACT
-    inline auto operator-(const Vec3 &vec) -> Vec3
+    inline auto operator-(const Vec3 &vec) const -> Vec3
     {
         return {x - vec.x, y - vec.y, z - vec.z};
     }
@@ -63,7 +63,7 @@ struct Vec3
     }
 
     // MULTIPLY
-    inline auto operator*(const Vec3 &vec) -> Vec3
+    inline auto operator*(const Vec3 &vec) const -> Vec3
     {
         return {x * vec.x, y * vec.y, z * vec.z};
     }
@@ -74,13 +74,13 @@ struct Vec3
     }
 
     // SCALE
-    inline auto operator*(float s) -> Vec3
+    inline auto operator*(float s) const -> Vec3
     {
         return {x * s, y * s, z * s};
     }
 
     // DIVIDE
-    inline auto operator/(const Vec3 &vec) -> Vec3
+    inline auto operator/(const Vec3 &vec) const -> Vec3
     {
         return {x / vec.x, y / vec.y, z / vec.z};
     }
@@ -93,19 +93,19 @@ struct Vec3
     }
 
     // DOT PRODUCT
-    inline auto dot(const Vec3 &vec) -> float
+    inline auto dot(const Vec3 &vec) const -> float
     {
         return (x * vec.x) + (y * vec.y) + (z * vec.z);
     }
 
     // CROSS PRODUCT
-    inline auto cross(const Vec3 &vec) -> Vec3
+    inline auto cross(const Vec3 &vec) const -> Vec3
     {
         return {y * vec.z - z * vec.y, z * vec.x - x * vec.z, x * vec.y - y * vec.x};
     }
 
     // LENGTH
-    inline auto length() -> float
+    inline auto length() const -> float
     {
         return sqrtf((x * x) + (y * y) + (z * z));
     }

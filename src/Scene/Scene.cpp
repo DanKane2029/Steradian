@@ -1,13 +1,60 @@
 #include "Scene.h"
 
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <stdexcept>
 using json = nlohmann::json;
 
 #include "Scene/Light.h"
 #include "Scene/SceneObject.h"
 #include "Utils/ObjModel.h"
+
+namespace
+{
+
+/**
+ * reads an optional float from a json object, falling back to a default
+ *
+ * Several scene files in res/scenes predate later material fields. Treating those
+ * fields as optional keeps older scenes loadable instead of throwing on parse.
+ */
+auto optionalFloat(const json &data, const char *key, float fallback) -> float
+{
+    if (!data.contains(key) || data.at(key).is_null())
+    {
+        return fallback;
+    }
+
+    return data.at(key).get<float>();
+}
+
+/**
+ * resolves an asset path referenced by a scene file
+ *
+ * Relative paths are resolved against the directory containing the scene file, so a
+ * scene and its models/textures can be moved or checked out anywhere. Absolute paths
+ * are honoured as-is for backwards compatibility.
+ */
+auto resolveAssetPath(const std::string &assetPath, const std::filesystem::path &sceneDir) -> std::string
+{
+    std::filesystem::path path(assetPath);
+
+    if (!path.is_absolute())
+    {
+        path = sceneDir / path;
+    }
+
+    if (!std::filesystem::exists(path))
+    {
+        throw std::runtime_error("Scene references a file that does not exist: " + path.string());
+    }
+
+    return path.string();
+}
+
+} // namespace
 
 /**
  * returns the list of scene object that are present in the scene
@@ -117,8 +164,16 @@ void Scene::createAcceleratedStructure()
 Scene::Scene(std::string filePath)
 {
     std::ifstream f(filePath);
+    if (!f)
+    {
+        throw std::runtime_error("Could not open scene file: " + filePath);
+    }
+
     json data = json::parse(f);
     f.close();
+
+    // Asset paths inside the scene are resolved relative to the scene file itself.
+    const std::filesystem::path sceneDir = std::filesystem::absolute(filePath).parent_path();
 
     m_AmbientLighting = Vec3(data.at(m_keywords.ambientLighting).get<std::vector<float>>());
     m_Camera = Camera(Vec3(data.at(m_keywords.camera).at(m_keywords.cameraOrg).get<std::vector<float>>()),
@@ -134,10 +189,10 @@ Scene::Scene(std::string filePath)
         Vec3 diffuse = materialData.at("diffuse").get<std::vector<float>>();
         Vec3 specular = materialData.at("specular").get<std::vector<float>>();
 
-        float specularExponent = materialData.at("specularExponent");
-        float transparency = materialData.at("transparency");
-        float refraction = materialData.at("refraction");
-        float reflection = materialData.at("reflection");
+        float specularExponent = optionalFloat(materialData, "specularExponent", 1.0f);
+        float transparency = optionalFloat(materialData, "transparency", 0.0f);
+        float refraction = optionalFloat(materialData, "refraction", 1.0f);
+        float reflection = optionalFloat(materialData, "reflection", 0.0f);
 
         Material material(name, ambient, diffuse, specular, specularExponent, transparency, refraction, reflection);
         registerMaterial(material);
@@ -150,7 +205,7 @@ Scene::Scene(std::string filePath)
         std::string materialId = object.at("material");
         if (type == "objModel")
         {
-            std::string path = object.at("path");
+            std::string path = resolveAssetPath(object.at("path"), sceneDir);
             ObjModel objModel(path);
             addObjects(objModel.getSceneObjects(), materialId);
         }

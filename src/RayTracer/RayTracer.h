@@ -1,10 +1,12 @@
 #pragma once
+#include <cstdint>
 #include <mutex>
 
 #include "Camera.h"
 #include "Hit.h"
 #include "Scene/Scene.h"
 #include "Utils/Config.h"
+#include "Utils/Random.h"
 #include "Window/PixelBuffer.h"
 
 /**
@@ -46,6 +48,24 @@ class RayTracer
     void sampleScene(float x, float y);
 
     /**
+     * \brief Renders a horizontal band of the image to completion.
+     *
+     * Renders every pixel in rows [yStart, yEnd) with a fixed number of samples each.
+     * Unlike sampleScene this covers its region exhaustively and deterministically: the
+     * generator is seeded from the render seed and the row, so the result depends only
+     * on (seed, samplesPerPixel) and not on thread count or scheduling.
+     *
+     * Each band must be rendered by at most one thread. Bands do not overlap, so no
+     * synchronization on the pixel buffer is required.
+     *
+     * \param yStart The first row of the band, inclusive.
+     * \param yEnd The last row of the band, exclusive.
+     * \param samplesPerPixel The number of samples to average per pixel.
+     * \param seed The base seed for the render.
+     */
+    void renderRows(int yStart, int yEnd, unsigned int samplesPerPixel, uint64_t seed);
+
+    /**
      * \brief Shoots a ray into the scene.
      *
      * Shoots a ray into the scene and returns a Hit object that describes the ray object intersection.
@@ -66,7 +86,7 @@ class RayTracer
      * \param recurseLevel The current level of recursion used for reflection calculations.
      * \returns The color of the hit as a Vector3.
      */
-    auto getHitColor(Hit hit, unsigned int recurseLevel) -> Vec3;
+    auto getHitColor(Hit hit, unsigned int recurseLevel, Rng &rng) -> Vec3;
 
     /**
      * \brief Calculates if the position is in a shadow.
@@ -78,11 +98,31 @@ class RayTracer
      * \returns A float value that determines how much the position is in shadow. 0 is completely in shadow and 1 is
      * completly lit.
      */
-    auto shootShadowRays(std::shared_ptr<Light> light, Vec3 pos) -> float;
+    auto shootShadowRays(std::shared_ptr<Light> light, Vec3 pos, Rng &rng) -> float;
 
     void updateAspectRatio(float aspectRatio);
 
   private:
+    /**
+     * \brief Computes the color of a single sample through the given pixel.
+     *
+     * \param ix The pixel column.
+     * \param iy The pixel row.
+     * \param jitterX Sub-pixel horizontal offset in [0, 1).
+     * \param jitterY Sub-pixel vertical offset in [0, 1).
+     * \param rng The generator to use for stochastic effects such as soft shadows.
+     * \returns The linear color of the sample.
+     */
+    auto samplePixel(int ix, int iy, float jitterX, float jitterY, Rng &rng) -> Vec3;
+
+    /**
+     * \brief Builds the primary camera ray through a point on the film plane.
+     *
+     * \param u Horizontal film coordinate in [0, 1).
+     * \param v Vertical film coordinate in [0, 1).
+     */
+    auto makeCameraRay(float u, float v) -> Ray;
+
     unsigned int m_NumShadowRays = 5;
     unsigned int m_ReflectionLimit = 100;
     unsigned int m_MaxRecurseLevel = 10;
