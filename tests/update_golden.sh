@@ -19,7 +19,7 @@ if [ ! -x "$RENDERER" ]; then
 fi
 
 # Keep these in sync with GOLDEN_SCENES in tests/CMakeLists.txt.
-SCENES=(single_sphere single_triangle two_spheres test_obj_ball)
+SCENES=(single_sphere single_triangle two_spheres test_obj_ball test_man_obj)
 SAMPLES=4
 SEED=1
 

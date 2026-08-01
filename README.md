@@ -17,18 +17,13 @@ above a surface is the thing the renderer is being built to do.
 | 0 | Build and run reproducibly; headless PNG output; deterministic seeding | done |
 | 1 | Golden-image regression tests, CI, BVH/ray instrumentation | done |
 | 2 | Correctness pass: camera basis and real FOV, ray epsilons, OBJ triangulation, textures | done |
-| 3 | Performance: flat SAH BVH that actually culls, typed primitive arrays, slim hit record, thread pool | planned |
+| 3 | Performance: flat SAH BVH that actually culls, occlusion queries, thread pool | done |
 | 4 | Replace the integrator with Monte Carlo path tracing: hemisphere sampling, BSDFs, area lights, tonemapping | planned |
 
 ### Known issues being worked through
 
 These are real and measured, not speculative:
 
-- **The acceleration structure performs no culling.** Traversal descends into every node and
-  tests every primitive; the bounding-box test exists but is never called. Worse, primitives
-  are duplicated across children, so `ball.obj` — 960 triangles — costs **1236 primitive tests
-  per ray**, more work than simply testing every triangle in the scene. Replacing this is
-  Stage 3, and it is the largest single win available.
 - **Shading is Blinn-Phong, not a BSDF.** No energy conservation, no importance sampling, and
   ambient light is added as a flat constant rather than being derived from the scene.
 - **The `transparency` and `refraction` material fields are parsed and ignored.** Dielectrics
@@ -136,14 +131,38 @@ cannot tell "the BVH culls well" apart from "the machine was idle", but primitiv
 per ray can:
 
 ```
-rays traced      50048 (0.0766082 M/s)
-node visits      23272320 (465 per ray)
-primitive tests  72419456 (1447 per ray)
+rays traced      50048
+node visits      635010 (12.7 per ray)
+primitive tests  1662720 (33.2 per ray)
 ```
 
-That is `ball.obj`, which has **960 triangles**. At 1447 primitive tests per ray the
-current structure is doing *more* work than testing every triangle in the scene, because
-primitives are duplicated across octree children. Replacing it is Stage 3.
+Primitive tests per ray is the number that matters for acceleration work: it is
+independent of machine speed and load, and it goes down only if traversal is genuinely
+rejecting geometry.
+
+### Acceleration structure
+
+The renderer previously used a median-split octree that **never tested a bounding box
+during traversal** — the test existed but had no callers. It visited every node and every
+primitive on every ray, and because primitives were assigned to children by centroid they
+were duplicated across children, so it performed *more* intersection tests than a brute
+force loop over the scene.
+
+It is now a binned-SAH BVH, flattened into a contiguous array, traversed iteratively,
+descending the nearer child first and shrinking the ray's far bound on each hit. Measured
+at 160×120, 1 spp:
+
+| Scene | Primitives | Tests/ray before | Tests/ray after | Time before | Time after |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `two_spheres` | 2 | 2 | 2 | 0.015 s | 0.002 s |
+| `test_obj_ball` | 960 | 1,236 | **33** | 0.90 s | 0.011 s |
+| `test_man_obj` | 48,918 | 52,309 | **63** | 101.4 s | **0.019 s** |
+
+The 48,918-triangle scene got **5,400× faster**, doing **830× fewer** intersection tests.
+Note the "before" figure of 52,309 tests per ray against 48,918 primitives: the old
+structure tested some primitives more than once.
+
+Output is unchanged by this: the same scene rendered before and after is byte-identical.
 
 ## Testing
 
@@ -153,9 +172,15 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-The suite is four golden-image comparisons plus a determinism check that renders the same
-scene at 1, 3 and 8 threads and requires the results to be byte-identical. It runs in
-about three seconds.
+The suite runs in about two seconds and covers three things:
+
+- **Five golden-image comparisons**, including a 48,918-triangle mesh.
+- **A determinism check** rendering the same scene at 1, 3 and 8 threads, requiring
+  byte-identical results.
+- **Acceleration structure consistency**: for thousands of random rays per scene, the BVH
+  must return exactly what a brute-force scan over every primitive returns. Golden images
+  prove the final picture is right; this proves the structure itself is not quietly
+  dropping or inventing intersections, which is precisely what the octree it replaced did.
 
 Because renders are deterministic, the image tolerances are deliberately tight (max one
 channel level, mean 0.02). Those numbers were picked against a measurement rather than

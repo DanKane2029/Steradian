@@ -79,8 +79,8 @@ class Scene
      *        which previously parsed the value and then discarded it.
      */
     void createAcceleratedStructure(unsigned int objectsInLeaf = 10);
-    std::shared_ptr<BVH> getAccelerationStructure()
+    auto getAccelerationStructure() const -> const BVH *
     {
-        return m_AcceleratedStructure;
+        return m_AcceleratedStructure.get();
     };
 };
