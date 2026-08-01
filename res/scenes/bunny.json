@@ -1,0 +1,117 @@
+{
+  "ambientLighting": [
+    0.42,
+    0.5,
+    0.62
+  ],
+  "camera": {
+    "org": [
+      0,
+      1.25,
+      4.0
+    ],
+    "lookAt": [
+      0,
+      0.72,
+      0
+    ],
+    "fov": 38
+  },
+  "materials": {
+    "floor": {
+      "type": "diffuse",
+      "albedo": [
+        0.58,
+        0.58,
+        0.6
+      ]
+    },
+    "body": {
+      "type": "diffuse",
+      "albedo": [
+        0.8,
+        0.72,
+        0.66
+      ]
+    },
+    "lamp": {
+      "type": "diffuse",
+      "albedo": [
+        0,
+        0,
+        0
+      ],
+      "emissive": [
+        90,
+        86,
+        78
+      ]
+    }
+  },
+  "objects": [
+    {
+      "type": "triangle",
+      "material": "floor",
+      "point0": [
+        -12,
+        0,
+        -12
+      ],
+      "point1": [
+        12,
+        0,
+        -12
+      ],
+      "point2": [
+        12,
+        0,
+        12
+      ]
+    },
+    {
+      "type": "triangle",
+      "material": "floor",
+      "point0": [
+        -12,
+        0,
+        -12
+      ],
+      "point1": [
+        12,
+        0,
+        12
+      ],
+      "point2": [
+        -12,
+        0,
+        12
+      ]
+    },
+    {
+      "type": "objModel",
+      "material": "body",
+      "path": "../models/bunny.obj",
+      "scale": 10.3671,
+      "rotate": [
+        0,
+        150,
+        0
+      ],
+      "translate": [
+        0.1746,
+        -0.342,
+        0.0159
+      ]
+    },
+    {
+      "type": "sphere",
+      "material": "lamp",
+      "center": [
+        2.6,
+        4.2,
+        2.6
+      ],
+      "radius": 0.5
+    }
+  ]
+}

@@ -1,0 +1,117 @@
+{
+  "ambientLighting": [
+    0.42,
+    0.5,
+    0.62
+  ],
+  "camera": {
+    "org": [
+      0,
+      1.25,
+      4.0
+    ],
+    "lookAt": [
+      0,
+      0.72,
+      0
+    ],
+    "fov": 38
+  },
+  "materials": {
+    "floor": {
+      "type": "diffuse",
+      "albedo": [
+        0.58,
+        0.58,
+        0.6
+      ]
+    },
+    "body": {
+      "type": "diffuse",
+      "albedo": [
+        0.72,
+        0.66,
+        0.55
+      ]
+    },
+    "lamp": {
+      "type": "diffuse",
+      "albedo": [
+        0,
+        0,
+        0
+      ],
+      "emissive": [
+        90,
+        86,
+        78
+      ]
+    }
+  },
+  "objects": [
+    {
+      "type": "triangle",
+      "material": "floor",
+      "point0": [
+        -12,
+        0,
+        -12
+      ],
+      "point1": [
+        12,
+        0,
+        -12
+      ],
+      "point2": [
+        12,
+        0,
+        12
+      ]
+    },
+    {
+      "type": "triangle",
+      "material": "floor",
+      "point0": [
+        -12,
+        0,
+        -12
+      ],
+      "point1": [
+        12,
+        0,
+        12
+      ],
+      "point2": [
+        -12,
+        0,
+        12
+      ]
+    },
+    {
+      "type": "objModel",
+      "material": "body",
+      "path": "../models/dragon.obj",
+      "scale": 9.6953,
+      "rotate": [
+        0,
+        -110,
+        0
+      ],
+      "translate": [
+        0.0571,
+        -0.5113,
+        0.0446
+      ]
+    },
+    {
+      "type": "sphere",
+      "material": "lamp",
+      "center": [
+        2.6,
+        4.2,
+        2.6
+      ],
+      "radius": 0.5
+    }
+  ]
+}
