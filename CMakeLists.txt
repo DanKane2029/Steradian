@@ -25,6 +25,12 @@ option(PT_BUILD_VIEWER "Build the interactive GLFW viewer" ON)
 # would make golden-image comparisons non-portable. Opt in for benchmarking.
 option(PT_NATIVE_ARCH "Optimize for the host CPU (-march=native)" OFF)
 
+# Ray, node-visit and primitive-test counters. These are what make acceleration
+# structure work measurable, and cost one thread-local increment each.
+option(PT_ENABLE_STATS "Collect render statistics" ON)
+
+option(PT_BUILD_TESTS "Build the golden-image regression tests" ON)
+
 # Common warning flags, applied privately so third-party code is unaffected.
 add_library(pt_warnings INTERFACE)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -60,6 +66,13 @@ endif()
 
 add_subdirectory(src)
 
+if(PT_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
+
 message(STATUS "steradian: build type  = ${CMAKE_BUILD_TYPE}")
 message(STATUS "steradian: viewer      = ${PT_VIEWER_ENABLED}")
 message(STATUS "steradian: native arch = ${PT_NATIVE_ARCH}")
+message(STATUS "steradian: stats       = ${PT_ENABLE_STATS}")
+message(STATUS "steradian: tests       = ${PT_BUILD_TESTS}")

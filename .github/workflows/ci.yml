@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Build and test (${{ matrix.build_type }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [Release, Debug]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # The renderer core has no windowing dependency, so the tests build headless and
+      # need no display or GL packages. Building the viewer is a separate job.
+      - name: Configure
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DPT_BUILD_VIEWER=OFF \
+            -DPT_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build -j$(nproc)
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      # A failing golden test is much easier to judge by eye than by numbers.
+      - name: Upload rendered output on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: render-output-${{ matrix.build_type }}
+          path: |
+            build/tests/*.png
+            tests/golden/*.png
+          if-no-files-found: ignore
+
+  viewer:
+    name: Build viewer
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install OpenGL and X11 development files
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev xorg-dev
+
+      # A missing dependency downgrades the build to headless with a warning rather than
+      # failing, which would let this job pass without compiling any viewer code. Assert
+      # the viewer really was enabled.
+      - name: Configure
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DPT_BUILD_VIEWER=ON 2>&1 | tee configure.log
+          grep -q 'viewer      = ON' configure.log \
+            || { echo "::error::Viewer was not enabled; GL/X11 dependencies are missing"; exit 1; }
+
+      - name: Build
+        run: cmake --build build -j$(nproc)
+
+  format:
+    name: clang-format
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check formatting
+        run: |
+          # Vendored stb headers are excluded; they are not ours to reformat.
+          files=$(find src tests -name '*.h' -o -name '*.cpp' \
+            | grep -v 'stb_image.h' | grep -v 'stb_image_write.h')
+          clang-format --dry-run --Werror $files

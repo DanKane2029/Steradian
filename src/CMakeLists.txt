@@ -15,6 +15,7 @@ add_library(pt_core STATIC
     Utils/Config.cpp
     Utils/ImageIO.cpp
     Utils/ObjModel.cpp
+    Utils/Stats.cpp
     Window/PixelBuffer.cpp
 )
 
@@ -23,6 +24,12 @@ target_link_libraries(pt_core
     PUBLIC nlohmann_json::nlohmann_json
     PRIVATE pt_warnings
 )
+
+if(PT_ENABLE_STATS)
+    # PUBLIC: the counters are incremented from header-inlined traversal code, so every
+    # consumer must agree on whether they exist.
+    target_compile_definitions(pt_core PUBLIC PT_ENABLE_STATS)
+endif()
 
 add_executable(steradian main.cpp)
 target_link_libraries(steradian PRIVATE pt_core pt_warnings)

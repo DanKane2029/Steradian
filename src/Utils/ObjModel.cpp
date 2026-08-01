@@ -49,7 +49,8 @@ auto ObjModel::loadModel(std::string filePath) -> bool
             }
             else if (lineType == VERTEX_TEX)
             {
-                std::cout << "Texture coord" << std::endl;
+                // TODO: texture coordinates are recognized but not yet stored, so meshes
+                // still have no UVs. Parsing them is part of the texturing work.
             }
             else if (lineType == VERTEX_NORM)
             {

@@ -15,7 +15,7 @@ above a surface is the thing the renderer is being built to do.
 | Stage | Goal | State |
 | --- | --- | --- |
 | 0 | Build and run reproducibly; headless PNG output; deterministic seeding | done |
-| 1 | Golden-image regression tests, CI, BVH/ray instrumentation | in progress |
+| 1 | Golden-image regression tests, CI, BVH/ray instrumentation | done |
 | 2 | Correctness pass: camera basis and real FOV, ray epsilons, OBJ triangulation, textures | planned |
 | 3 | Performance: flat SAH BVH that actually culls, typed primitive arrays, slim hit record, thread pool | planned |
 | 4 | Replace the integrator with Monte Carlo path tracing: hemisphere sampling, BSDFs, area lights, tonemapping | planned |
@@ -79,7 +79,9 @@ cmake -B build -DPT_BUILD_VIEWER=OFF
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `PT_BUILD_VIEWER` | `ON` | Build the interactive GLFW viewer |
-| `PT_NATIVE_ARCH` | `OFF` | Compile with `-march=native`. Off by default because it changes floating point results between machines |
+| `PT_BUILD_TESTS` | `ON` | Build the golden-image regression tests |
+| `PT_ENABLE_STATS` | `ON` | Collect ray/node/primitive counters |
+| `PT_NATIVE_ARCH` | `OFF` | Compile with `-march=native`. Off by default because it changes floating point results between machines, which would make golden images non-portable |
 
 ## Running
 
@@ -110,6 +112,50 @@ testing possible.
 
 Asset paths inside a scene file are resolved relative to that scene file, so scenes and
 models can be moved or checked out anywhere.
+
+### Statistics
+
+Builds carry ray, node-visit and primitive-test counters (`-DPT_ENABLE_STATS=OFF` to
+remove them). They are what make acceleration-structure work measurable — wall-clock time
+cannot tell "the BVH culls well" apart from "the machine was idle", but primitive tests
+per ray can:
+
+```
+rays traced      50048 (0.0766082 M/s)
+node visits      23272320 (465 per ray)
+primitive tests  72419456 (1447 per ray)
+```
+
+That is `ball.obj`, which has **960 triangles**. At 1447 primitive tests per ray the
+current structure is doing *more* work than testing every triangle in the scene, because
+primitives are duplicated across octree children. Replacing it is Stage 3.
+
+## Testing
+
+```sh
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+ctest --test-dir build --output-on-failure
+```
+
+The suite is four golden-image comparisons plus a determinism check that renders the same
+scene at 1, 3 and 8 threads and requires the results to be byte-identical. It runs in
+about three seconds.
+
+Because renders are deterministic, the image tolerances are deliberately tight (max one
+channel level, mean 0.02). Those numbers were picked against a measurement rather than
+guessed: a deliberate 2% brightness change moves max by 2–5 and mean by 0.027–0.30, so
+anything looser silently passes a real regression.
+
+When a change is *meant* to alter output, refresh the references and **look at them**:
+
+```sh
+tests/update_golden.sh build
+git diff --stat tests/golden
+```
+
+Refreshing references without reviewing them turns the suite from a test into a record of
+whatever the code last happened to do.
 
 ## Layout
 
