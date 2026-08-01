@@ -42,6 +42,21 @@ struct Material
     /** index of refraction. Dielectrics only; 1.5 is typical glass */
     float ior = 1.5f;
 
+    /**
+     * \brief How strongly the interior of a dielectric absorbs light, per channel.
+     *
+     * Absorption happens along the path *through* a material, not at its surface, so what
+     * it produces depends on how far light travelled inside: a thick part of a glass
+     * object is darker and more saturated than a thin one, and the colour deepens towards
+     * the middle. A surface tint cannot reproduce that, because it has no notion of
+     * distance.
+     *
+     * These are extinction coefficients, so larger absorbs more, and the channel that
+     * survives is the colour you see. Absorbing red and a little green leaves the blue
+     * green cast of thick window glass. Zero, the default, is perfectly clear.
+     */
+    Vec3 absorption{};
+
     /** optional albedo texture, sampled with the surface's texture coordinates */
     Texture texture;
 

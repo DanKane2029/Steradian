@@ -142,6 +142,7 @@ movement speed.
 | `cornell_box` | Global illumination: colour bleeding, soft shadows, a mirror |
 | `glossy_spheres` | Conductors at three roughnesses |
 | `glass_lens` | Refraction: a glass sphere inverts the scene behind it |
+| `glass_tinted` | Absorption: clear, tinted and deeply coloured glass |
 | `two_spheres` | A diffuse and a metal sphere under a sky |
 | `single_sphere`, `single_triangle` | Minimal scenes |
 | `test_obj_ball` | A 960 triangle mesh |
@@ -217,7 +218,7 @@ uncovered.
 | --- | --- |
 | `diffuse` | Lambertian. `albedo` is the fraction of light reflected |
 | `metal` | GGX microfacet conductor. `albedo` tints the reflection, `roughness` sets the width of the highlight |
-| `dielectric` | Glass. Refracts with Fresnel-weighted reflection and total internal reflection, controlled by `ior` (1.5 is typical glass) |
+| `dielectric` | Glass. Refracts with Fresnel-weighted reflection and total internal reflection, controlled by `ior` (1.5 is typical glass), and absorbs along the path through its interior via `absorption` |
 
 Any material with a non-zero `emissive` is a light. There are no light objects as such:
 lights are simply geometry that emits, and the older `lights` array in a scene file is
@@ -253,6 +254,20 @@ build time or memory and no change whatsoever to the resulting image.
 
 Shadow rays use a separate query that stops at the first thing it meets, since they only
 need to know whether the light is visible, not what is nearest.
+
+### Coloured glass
+
+![Clear, tinted and deeply absorbing glass](docs/glass.png)
+
+A material's colour can come from its surface or from its interior, and for glass it is
+the interior that matters. Light is absorbed as it travels *through* the material, so how
+much survives depends on the distance covered: each sphere above is lighter at its rim,
+where light passes through only a little glass, and deepest through its middle. Doubling
+the thickness squares the fraction that gets out rather than halving it.
+
+A surface tint cannot do this, having no notion of how far anything travelled. Set
+`absorption` per channel; the channel that survives is the colour you see, so absorbing
+red leaves the blue green cast of thick window glass.
 
 ### Colour
 
@@ -412,11 +427,8 @@ and therefore continuous integration, possible.
   not modelled, so rough metal comes out darker than it should. Negligible below about 0.4
   roughness and severe above it: a fully reflective conductor returns 96% of the light at
   0.4 roughness and 32% at 1.0. The fix is a multiple-scattering compensation term.
-- **Dielectrics are smooth only.** Roughness applies to conductors; glass is perfectly
-  clear, so frosted or etched surfaces are not available.
-- **Glass does not absorb.** A thick piece is exactly as clear as a thin one, since there
-  is no attenuation with distance travelled through the material. `albedo` tints every
-  interaction with the surface rather than the path through the interior.
+- **Dielectric surfaces are smooth.** Roughness applies to conductors, so frosted or
+  etched glass is not available.
 - **Direct light sampling covers spherical emitters only.** Emissive geometry of other
   shapes still lights a scene correctly, through ordinary path tracing, but more noisily.
 - **Textures are not wired up.** Texture coordinates are loaded and interpolated and the

@@ -231,6 +231,11 @@ auto Integrator::radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) c
     Vec3 previousPosition{};
     float previousBsdfPdf = 0.0f;
 
+    // The material the path is currently travelling inside, if any. Absorption is applied
+    // over the distance between two hits rather than at a surface, so this has to survive
+    // from one iteration to the next.
+    const Material *interior = nullptr;
+
     for (unsigned int depth = 0; depth <= m_MaxDepth; depth++)
     {
         Stats::countRay();
@@ -240,6 +245,19 @@ auto Integrator::radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) c
         {
             radiance += throughput * background(ray.dir);
             break;
+        }
+
+        // Attenuate over the distance just travelled, if that was through a material.
+        // Beer's law: what survives falls off exponentially with distance, so doubling
+        // the thickness squares the transmitted fraction rather than halving it.
+        if (interior != nullptr)
+        {
+            const Vec3 &k = interior->absorption;
+
+            if (k.x > 0.0f || k.y > 0.0f || k.z > 0.0f)
+            {
+                throughput *= Vec3(std::exp(-k.x * hit.time), std::exp(-k.y * hit.time), std::exp(-k.z * hit.time));
+            }
         }
 
         const Material &material = m_Scene->getMaterialByIndex(hit.materialIndex);
@@ -419,6 +437,10 @@ auto Integrator::radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) c
             {
                 nextDirection = refracted;
                 nextOrigin = Ray::offsetOrigin(hit.position, -hit.normal);
+
+                // Refracting is the only way to cross the boundary, so this is where the
+                // path enters or leaves the interior.
+                interior = hit.frontFace ? &material : nullptr;
             }
 
             throughput *= albedo;
