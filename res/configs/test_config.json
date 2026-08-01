@@ -2,6 +2,6 @@
   "windowHeight": 800,
   "windowWidth": 1000,
   "numThreads": 8,
-  "numChildrenInBVHLeafNodes": 25,
+  "numChildrenInBVHLeafNodes": 2,
   "maxRecurseLevel": 10
 }

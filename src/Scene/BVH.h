@@ -61,7 +61,7 @@ class BVH
      * \param objectList The primitives to organize.
      * \param objectsInLeaf Maximum primitives per leaf.
      */
-    explicit BVH(const std::vector<std::shared_ptr<SceneObject>> &objectList, unsigned int objectsInLeaf = 4);
+    explicit BVH(const std::vector<std::shared_ptr<SceneObject>> &objectList, unsigned int objectsInLeaf = 2);
 
     /**
      * \brief Finds the closest intersection along a ray.

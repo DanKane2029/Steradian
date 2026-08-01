@@ -125,6 +125,8 @@ movement speed.
 | `single_sphere`, `single_triangle` | Minimal scenes |
 | `test_obj_ball` | A 960 triangle mesh |
 | `test_man_obj` | A 48,918 triangle mesh |
+| `bunny` | The Stanford Bunny, 69,451 triangles |
+| `dragon` | The Stanford Dragon, 202,520 triangles |
 
 ### Testing
 
@@ -132,7 +134,8 @@ movement speed.
 ctest --test-dir build --output-on-failure
 ```
 
-Thirteen tests, about four seconds.
+Eighteen tests, about seventeen seconds. Most of that is path tracing the two Stanford
+models; everything else finishes in around three.
 
 ---
 
@@ -205,7 +208,10 @@ cannot take part in the importance sampling above at all.
 
 ### Finding what a ray hits
 
-![A 48,918 triangle mesh](docs/mesh.png)
+<p align="center">
+  <img src="docs/bunny.png" width="46%" alt="The Stanford Bunny, 69,451 triangles">
+  <img src="docs/dragon.png" width="46%" alt="The Stanford Dragon, 202,520 triangles">
+</p>
 
 Testing every ray against every triangle is hopeless at any real scene size, so primitives
 are organized into a **bounding volume hierarchy** built with a binned surface area
@@ -213,8 +219,16 @@ heuristic. It is flattened into one contiguous array and walked iteratively, ent
 nearer child first and shrinking the ray's far limit at every hit, so whole subtrees lying
 beyond the closest intersection found so far are skipped without being visited.
 
-For the mesh above, at 48,918 triangles, that is the difference between **52,309**
-primitive tests per ray and **63**.
+The dragon above holds 202,520 triangles and costs about **52** primitive tests per ray.
+An earlier structure, which never tested a bounding box at all, spent **52,309** tests per
+ray on a mesh a quarter that size.
+
+How many primitives a leaf may hold matters more than it appears, because every leaf a ray
+reaches costs a test against each primitive inside it. A generous leaf therefore multiplies
+the cost of every visit. Reducing it from 25, a figure inherited from an earlier
+acceleration structure where it was appropriate, to 2 cut the bunny from 1,343 primitive
+tests per ray to 109, and rendering time by nearly threefold, with no measurable change to
+build time or memory and no change whatsoever to the resulting image.
 
 Shadow rays use a separate query that stops at the first thing it meets, since they only
 need to know whether the light is visible, not what is nearest.
@@ -262,9 +276,9 @@ legitimately alter every pixel.
 
 ## How it is tested
 
-Thirteen tests, running in about four seconds.
+Eighteen tests, running in about seventeen seconds.
 
-**Reference images.** Seven scenes rendered at a fixed seed and sample count, compared
+**Reference images.** Nine scenes rendered at a fixed seed and sample count, compared
 against committed references. Tolerances are tight, and were chosen by measuring what a
 deliberately introduced 2% brightness error actually looks like rather than by picking a
 number that felt safe.
@@ -362,7 +376,8 @@ The config file is separate because it describes the render rather than the scen
 | `src/Utils/` | Vector maths, sampling, microfacet model, denoiser, thread pool, OBJ and image handling |
 | `src/Window/` | Pixel buffer, and the optional viewer and camera controls |
 | `tests/` | Reference images and the checks described above |
-| `res/` | Scenes, configs and models |
+| `res/` | Scenes, configs and models. See `res/models/ATTRIBUTION.md` |
+| `docs/` | Images used by this page |
 
 `RayTracer`, `Scene` and `Utils` include each other cyclically and build as a single
 library. Only the viewer depends on GLFW and OpenGL, which is what keeps headless builds,

@@ -42,7 +42,7 @@ target_link_libraries(bvh_consistency PRIVATE pt_core pt_warnings)
 # Ray counts are per scene because the brute force reference, not the BVH, sets the cost:
 # it is O(rays * primitives), so the 48,918 triangle scene gets proportionally fewer rays
 # to keep the suite quick.
-foreach(scene_and_rays "two_spheres:20000" "test_obj_ball:20000" "test_man_obj:2000")
+foreach(scene_and_rays "two_spheres:20000" "test_obj_ball:20000" "test_man_obj:2000" "bunny:800")
     string(REPLACE ":" ";" parts ${scene_and_rays})
     list(GET parts 0 scene)
     list(GET parts 1 rays)
@@ -68,6 +68,11 @@ set(GOLDEN_SCENES
     # reversed, which is what a lens does and what nothing else in the scene can fake, so
     # the reference image pins refraction down rather than merely exercising it.
     glass_lens
+    # The Stanford models. The dragon at 202,520 triangles is by a wide margin the
+    # heaviest thing the acceleration structure is asked to organize, which is the point
+    # of including it.
+    bunny
+    dragon
 )
 
 set(GOLDEN_SAMPLES 64)
