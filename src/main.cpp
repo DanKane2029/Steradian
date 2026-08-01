@@ -226,7 +226,7 @@ auto main(int argc, char *argv[]) -> int
             PixelBuffer pixelBuffer(config.windowWidth, config.windowHeight);
 
             Scene scene(options.scenePath);
-            scene.createAcceleratedStructure();
+            scene.createAcceleratedStructure(config.numChildrenInBVHLeafNodes);
 
             RayTracer rayTracer(&pixelBuffer, &scene, config);
 
@@ -284,7 +284,7 @@ auto main(int argc, char *argv[]) -> int
         window.setPixelBuffer(&pixelBuffer);
 
         Scene scene(options.scenePath);
-        scene.createAcceleratedStructure();
+        scene.createAcceleratedStructure(config.numChildrenInBVHLeafNodes);
 
         RayTracer rayTracer(&pixelBuffer, &scene, config);
         window.setRayTracer(&rayTracer);

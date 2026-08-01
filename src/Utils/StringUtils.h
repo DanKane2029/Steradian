@@ -11,7 +11,7 @@
  * \param inputString - the string to be split
  * \param delimiter - the string that splits the input string
  */
-auto splitString(std::string &inputString, std::string delimiter) -> std::vector<std::string>
+inline auto splitString(const std::string &inputString, const std::string &delimiter) -> std::vector<std::string>
 {
     std::vector<std::string> splitString;
 

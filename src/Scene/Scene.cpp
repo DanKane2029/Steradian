@@ -61,7 +61,7 @@ auto resolveAssetPath(const std::string &assetPath, const std::filesystem::path 
  *
  * \return - the vector of scene object pointers in the scene
  */
-auto Scene::getObjectList() -> std::vector<std::shared_ptr<SceneObject>>
+auto Scene::getObjectList() -> const std::vector<std::shared_ptr<SceneObject>> &
 {
     return m_ObjectList;
 }
@@ -99,7 +99,7 @@ void Scene::addObjects(std::vector<std::shared_ptr<SceneObject>> sceneObjectList
  *
  * \return - the list of light pointers in the scene
  */
-auto Scene::getLightList() -> std::vector<std::shared_ptr<Light>>
+auto Scene::getLightList() -> const std::vector<std::shared_ptr<Light>> &
 {
     return m_LightList;
 }
@@ -149,7 +149,7 @@ auto Scene::getMaterial(std::string materialName) -> std::shared_ptr<Material>
 /**
  * creates a bounding volume heirarchy to accelerate ray scene intersections
  */
-void Scene::createAcceleratedStructure()
+void Scene::createAcceleratedStructure(unsigned int objectsInLeaf)
 {
     if (m_ObjectList.size() <= 0)
     {
@@ -157,7 +157,8 @@ void Scene::createAcceleratedStructure()
     }
     else
     {
-        m_AcceleratedStructure = std::make_shared<BVH>(m_ObjectList);
+        // Honour the configured leaf size, which was parsed and then ignored.
+        m_AcceleratedStructure = std::make_shared<BVH>(m_ObjectList, objectsInLeaf);
     }
 }
 
@@ -176,8 +177,22 @@ Scene::Scene(std::string filePath)
     const std::filesystem::path sceneDir = std::filesystem::absolute(filePath).parent_path();
 
     m_AmbientLighting = Vec3(data.at(m_keywords.ambientLighting).get<std::vector<float>>());
-    m_Camera = Camera(Vec3(data.at(m_keywords.camera).at(m_keywords.cameraOrg).get<std::vector<float>>()),
-                      Vec3(data.at(m_keywords.camera).at(m_keywords.cameraLookAt).get<std::vector<float>>()));
+
+    const json &cameraData = data.at(m_keywords.camera);
+
+    // Field of view is given in degrees, which is what a person authoring a scene file
+    // expects to write. Optional so existing scenes keep working.
+    const float fovDegrees = optionalFloat(cameraData, "fov", 60.0f);
+    const float fovY = fovDegrees * static_cast<float>(M_PI) / 180.0f;
+
+    Vec3 worldUp(0.0f, 1.0f, 0.0f);
+    if (cameraData.contains("up"))
+    {
+        worldUp = Vec3(cameraData.at("up").get<std::vector<float>>());
+    }
+
+    m_Camera = Camera(Vec3(cameraData.at(m_keywords.cameraOrg).get<std::vector<float>>()),
+                      Vec3(cameraData.at(m_keywords.cameraLookAt).get<std::vector<float>>()), fovY, worldUp);
 
     json materials = data.at(m_keywords.materials);
     for (auto it = materials.begin(); it != materials.end(); ++it)
@@ -246,8 +261,9 @@ Scene::Scene(std::string filePath)
             Vec3 color(light.at("color").get<std::vector<float>>());
             float intensity = light.at("intensity");
             float radius = light.at("radius");
-            PointLight pointLight(pos, color, intensity, radius);
-            addLight(std::make_shared<Light>(pointLight));
+            // Constructed as a PointLight: wrapping it in make_shared<Light> sliced the derived
+            // object away.
+            addLight(std::make_shared<PointLight>(pos, color, intensity, radius));
         }
     }
 }

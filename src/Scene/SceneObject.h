@@ -63,6 +63,18 @@ class Triangle : public SceneObject
     Vec3 getCenterPoint() override;
     auto getPoints() -> std::vector<Vec3>;
 
+    /** attaches per-vertex texture coordinates, as loaded from a model file */
+    void setTextureCoords(Vec3 t0, Vec3 t1, Vec3 t2);
+
+    /** the geometric normal of the triangle's plane */
+    auto faceNormal() const -> Vec3;
+
+    /** interpolates vertex normals from barycentric coordinates (u, v) */
+    auto interpolateNormal(float u, float v) const -> Vec3;
+
+    /** interpolates vertex texture coordinates from barycentric coordinates (u, v) */
+    auto interpolateTextureCoord(float u, float v) const -> Vec3;
+
   private:
     Vec3 point0;
     Vec3 point1;
@@ -71,7 +83,13 @@ class Triangle : public SceneObject
     Vec3 normal0;
     Vec3 normal1;
     Vec3 normal2;
-    bool hasNormalVertices;
+
+    Vec3 texCoord0;
+    Vec3 texCoord1;
+    Vec3 texCoord2;
+
+    bool hasNormalVertices = false;
+    bool hasTextureCoords = false;
 };
 
 class Sphere : public SceneObject
@@ -83,6 +101,9 @@ class Sphere : public SceneObject
     Vec3 getNormal(Vec3 position) override;
     Hit rayIntersect(Ray ray) override;
     Vec3 getCenterPoint() override;
+
+    /** maps a point on the sphere to spherical texture coordinates in [0, 1] */
+    auto getTextureCoords(Vec3 pointOnSurface) const -> Vec3;
 
   private:
     Vec3 m_Center{};

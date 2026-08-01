@@ -10,15 +10,9 @@ RayTracer::RayTracer(PixelBuffer *pixelBuffer, Scene *scene, Config &config)
 {
     auto size = m_PixelBuffer->getSize();
 
-    m_FovX = atan2f((float)size.first, 2.0f);
-    m_FovY = atan2f((float)size.second, 2.0f);
-
     m_aspectRatio = (float)size.first / (float)size.second;
     m_NumShadowRays = config.numShadowRays;
     m_MaxRecurseLevel = config.maxRecurseLevel;
-
-    vx = tanf(m_FovX / 2.0f);
-    vy = tanf(m_FovY / 2.0f);
 }
 
 RayTracer::~RayTracer() = default;
@@ -30,24 +24,26 @@ void RayTracer::updateAspectRatio(float aspectRatio)
 
 auto RayTracer::makeCameraRay(float u, float v) -> Ray
 {
-    Camera camera = m_Scene->getCamera();
+    const Camera &camera = m_Scene->getCamera();
 
-    // NOTE: the film offsets below are applied in world XY rather than in the camera's
-    // own basis, so the camera only behaves correctly when looking along +/-Z, and the
-    // field of view is derived from the pixel count rather than from the scene. Both
-    // are left alone here so this change stays behaviour preserving; they are fixed in
-    // the camera work of a later stage.
-    const float worldX = ((u * 2.0f) - 1.0f) * vx * m_aspectRatio;
-    const float worldY = ((v * 2.0f) - 1.0f) * vy;
+    // Half-extents of the film plane at unit distance. The vertical half-height follows
+    // from the field of view; the horizontal one is that scaled by the aspect ratio.
+    //
+    // Previously the field of view was derived from the pixel count rather than from the
+    // scene (which pinned it at roughly 90 degrees regardless of configuration) and the
+    // aspect ratio was then applied on top of a term already derived from the width, so
+    // it was counted twice and the image came out horizontally stretched.
+    const float halfHeight = std::tan(camera.fovY * 0.5f);
+    const float halfWidth = halfHeight * m_aspectRatio;
 
-    const Vec3 pij = (camera.org + camera.dir) + Vec3(worldX, worldY, 0.0f);
+    // Map [0, 1] film coordinates to [-1, 1] screen coordinates.
+    const float screenX = ((u * 2.0f) - 1.0f) * halfWidth;
+    const float screenY = ((v * 2.0f) - 1.0f) * halfHeight;
 
-    // get the direction from camera origin to the sampled point
-    Vec3 dir = pij - camera.org;
-    dir.normalize();
+    // Offset along the camera's own basis rather than along world X and Y, so the camera
+    // can be oriented in any direction.
+    const Vec3 dir = camera.dir + (camera.right * screenX) + (camera.up * screenY);
 
-    // create a ray that starts at the camera origin and passes through the sampled
-    // point on the view plane
     return {camera.org, dir};
 }
 
@@ -139,28 +135,38 @@ auto RayTracer::getHitColor(Hit hit, unsigned int recurseLevel, Rng &rng) -> Vec
 
     finalColor += m_Scene->getAmbientLighting() + mat.ambient;
 
-    for (std::shared_ptr<Light> light : m_Scene->getLightList())
+    const Vec3 viewDir = (m_Scene->getCamera().org - hit.position).normalized();
+
+    for (const std::shared_ptr<Light> &light : m_Scene->getLightList())
     {
-        // diffuse component
-        Vec3 lightDir = light->getPos() - hit.position;
-        float lightDist = lightDir.length();
-        lightDir.normalize();
+        const Vec3 toLight = light->getPos() - hit.position;
+        const float lightDist = toLight.length();
+        const Vec3 lightDir = toLight.normalized();
 
-        Vec3 lightDiffuse = light->getColor() * light->getIntensity() * (light->getIntensity() / lightDist);
-        Vec3 dotDiffuse = std::max(lightDir.dot(hit.normal), 0.0f);
-        Vec3 diffuse = lightDiffuse * dotDiffuse * mat.diffuse;
+        const float nDotL = lightDir.dot(hit.normal);
 
-        // specular component (Jim Blinn)
-        Vec3 view = m_Scene->getCamera().org - hit.position;
-        view.normalize();
+        // Nothing to add for a surface facing away from the light, and evaluating the
+        // specular term there produced highlights on geometry the light cannot reach.
+        if (nDotL <= 0.0f)
+        {
+            continue;
+        }
 
-        Vec3 halfWay = lightDir + view;
-        halfWay.normalize();
+        // Inverse-square falloff. This previously read intensity^2 / distance, which is
+        // neither physical nor what the scene files were authored against.
+        const float falloff = light->getIntensity() / std::max(lightDist * lightDist, 1e-6f);
+        const Vec3 radiance = light->getColor() * falloff;
 
-        Vec3 specular = mat.specular * powf(hit.normal.dot(halfWay), mat.specularExponent);
+        const Vec3 diffuse = radiance * nDotL * mat.diffuse;
 
-        // shadow value
-        float shadowValue = shootShadowRays(light, hit.position, rng);
+        // Specular component (Blinn-Phong). The base is clamped to zero: powf with a
+        // negative base and a fractional exponent returns NaN, which then propagated
+        // through the running pixel average and poisoned everything it touched.
+        const Vec3 halfWay = (lightDir + viewDir).normalized();
+        const float nDotH = std::max(hit.normal.dot(halfWay), 0.0f);
+        const Vec3 specular = mat.specular * radiance * std::pow(nDotH, mat.specularExponent);
+
+        const float shadowValue = shootShadowRays(light, hit.position, hit.normal, rng);
 
         finalColor += (diffuse + specular) * shadowValue * (1.0f - mat.reflection);
     }
@@ -182,36 +188,43 @@ auto RayTracer::getHitColor(Hit hit, unsigned int recurseLevel, Rng &rng) -> Vec
     return finalColor;
 }
 
-auto RayTracer::shootShadowRays(std::shared_ptr<Light> light, Vec3 pos, Rng &rng) -> float
+auto RayTracer::shootShadowRays(const std::shared_ptr<Light> &light, Vec3 pos, Vec3 normal, Rng &rng) -> float
 {
-    Vec3 lightCenterPos = light->getPos();
-    Vec3 lightCenterDir = lightCenterPos - pos;
+    const Vec3 lightCenterPos = light->getPos();
+    const Vec3 toLight = lightCenterPos - pos;
 
-    Vec3 up = lightCenterDir.cross({0.0f, 1.0f, 0.0f});
+    // Build a basis spanning the light's disc, perpendicular to the direction towards it.
+    // Crossing with a fixed axis is degenerate when the light lies along that axis, which
+    // produced a zero-length vector and then NaN sample positions, so pick a reference
+    // axis that cannot be parallel to the light direction.
+    const Vec3 lightDirN = toLight.normalized();
+    const Vec3 reference = (std::fabs(lightDirN.y) > 0.9f) ? Vec3(1.0f, 0.0f, 0.0f) : Vec3(0.0f, 1.0f, 0.0f);
 
-    Vec3 u = lightCenterDir.cross(up);
-    u.normalize();
+    const Vec3 u = lightDirN.cross(reference).normalized();
+    const Vec3 v = lightDirN.cross(u).normalized();
 
-    Vec3 v = lightCenterDir.cross(u);
-    v.normalize();
+    // Start shadow rays just off the surface so they cannot immediately re-hit it.
+    const Vec3 origin = Ray::offsetOrigin(pos, normal);
 
     unsigned int litSources = 0;
 
     for (unsigned int i = 0; i < m_NumShadowRays; i++)
     {
-        float rx = rng.nextFloatSigned() * light->getRadius();
-        float ry = rng.nextFloatSigned() * light->getRadius();
+        // Sample the light's disc uniformly by area. Sampling a square, as this did
+        // before, gives a square light and biases samples towards the corners.
+        const float radius = light->getRadius() * std::sqrt(rng.nextFloat());
+        const float angle = rng.nextFloat() * 2.0f * static_cast<float>(M_PI);
 
-        Vec3 lightPos = lightCenterPos + (u * rx) + (v * ry);
+        const Vec3 lightPos = lightCenterPos + (u * (radius * std::cos(angle))) + (v * (radius * std::sin(angle)));
 
-        Vec3 lightDir = lightPos - pos;
-        float lightDist = lightDir.length();
-        lightDir.normalize();
+        const Vec3 shadowDir = lightPos - origin;
+        const float lightDist = shadowDir.length();
 
-        Ray shadowRay(pos, lightDir);
-        Hit shadowHit = shootRay(shadowRay);
+        // Bound the ray at the light: anything beyond it cannot cast a shadow, and this
+        // turns a closest-hit search into an occlusion test.
+        Ray shadowRay(origin, shadowDir, Ray::defaultEpsilon, lightDist - Ray::defaultEpsilon);
 
-        if (lightDist < shadowHit.time)
+        if (!shootRay(shadowRay).isHit)
         {
             litSources++;
         }

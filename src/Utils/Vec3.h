@@ -1,9 +1,9 @@
 #pragma once
 #include <cmath>
+#include <cstddef>
 #include <iostream>
-#include <nlohmann/json.hpp>
+#include <stdexcept>
 #include <vector>
-using json = nlohmann::json;
 
 /**
  * vector of size three to describe a position or direction in 3D space
@@ -19,8 +19,19 @@ struct Vec3
         this->z = z;
     }
 
-    Vec3(std::vector<float> list)
+    /**
+     * builds a vector from a list, as produced when deserializing a scene file
+     *
+     * The size is checked: a malformed scene should report a usable error rather than
+     * read past the end of the list.
+     */
+    Vec3(const std::vector<float> &list)
     {
+        if (list.size() < 3)
+        {
+            throw std::invalid_argument("Vec3 needs three components, got " + std::to_string(list.size()));
+        }
+
         this->x = list[0];
         this->y = list[1];
         this->z = list[2];
@@ -79,6 +90,19 @@ struct Vec3
         return {x * s, y * s, z * s};
     }
 
+    // SCALAR DIVIDE
+    inline auto operator/(float s) const -> Vec3
+    {
+        const float inv = 1.0f / s;
+        return {x * inv, y * inv, z * inv};
+    }
+
+    // NEGATE
+    inline auto operator-() const -> Vec3
+    {
+        return {-x, -y, -z};
+    }
+
     // DIVIDE
     inline auto operator/(const Vec3 &vec) const -> Vec3
     {
@@ -111,12 +135,33 @@ struct Vec3
     }
 
     // NORMALIZE
+    //
+    // Guarded against a zero-length vector, which would otherwise produce NaNs that
+    // propagate silently through shading and into the output image.
     inline void normalize()
     {
-        float length = this->length();
-        x /= length;
-        y /= length;
-        z /= length;
+        const float len = this->length();
+        if (len > 0.0f)
+        {
+            const float inv = 1.0f / len;
+            x *= inv;
+            y *= inv;
+            z *= inv;
+        }
+    }
+
+    /** returns a unit-length copy, leaving this vector unchanged */
+    inline auto normalized() const -> Vec3
+    {
+        Vec3 result = *this;
+        result.normalize();
+        return result;
+    }
+
+    /** squared length, for comparisons that do not need the square root */
+    inline auto lengthSquared() const -> float
+    {
+        return (x * x) + (y * y) + (z * z);
     }
 
     inline friend auto operator<<(std::ostream &os, const Vec3 &v) -> std::ostream &
