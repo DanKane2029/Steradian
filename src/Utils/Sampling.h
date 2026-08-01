@@ -4,6 +4,7 @@
 #include "Utils/Vec3.h"
 
 #include <cmath>
+#include <cstdint>
 
 /**
  * \brief Sampling routines used by the path integrator.
@@ -42,6 +43,49 @@ inline void buildBasis(const Vec3 &n, Vec3 &t, Vec3 &b)
 inline auto toWorld(const Vec3 &local, const Vec3 &t, const Vec3 &b, const Vec3 &n) -> Vec3
 {
     return (t * local.x) + (b * local.y) + (n * local.z);
+}
+
+/**
+ * \brief The i'th value of a radical inverse sequence in the given base.
+ *
+ * These sequences are progressive: every prefix of one covers the interval evenly, not
+ * just the whole. That is the property adaptive sampling needs, because it stops at a
+ * point decided while running and cannot know in advance how many samples a pixel will
+ * receive.
+ *
+ * A grid of strata does not have this property. Its coverage is only even once every cell
+ * has been visited, so stopping partway through leaves the samples bunched into whichever
+ * cells came first, and the pixel is measured from a sliver of its own area.
+ */
+inline auto radicalInverse(uint32_t i, uint32_t base) -> float
+{
+    float inverseBase = 1.0f / static_cast<float>(base);
+    float scale = inverseBase;
+    float result = 0.0f;
+
+    while (i > 0)
+    {
+        result += static_cast<float>(i % base) * scale;
+        i /= base;
+        scale *= inverseBase;
+    }
+
+    return result;
+}
+
+/**
+ * \brief A progressive 2D sample, offset so neighbouring pixels do not share a sequence.
+ *
+ * Without the offset every pixel would take the same points and their errors would line up
+ * into visible structure rather than looking like noise.
+ *
+ * \param index Which sample in the sequence.
+ * \param scramble Per-pixel offset.
+ */
+inline auto haltonSample(uint32_t index, uint32_t scramble, float &x, float &y)
+{
+    x = radicalInverse(index + (scramble & 0xffffu), 2);
+    y = radicalInverse(index + (scramble >> 16u), 3);
 }
 
 /**

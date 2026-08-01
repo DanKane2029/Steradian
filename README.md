@@ -88,6 +88,7 @@ watch; pass `--out` and it renders once to a file.
 | `--samples <n>` | Samples per pixel (default 16). The quality dial |
 | `--seed <n>` | Base seed (default 1) |
 | `--threads <n>` | Worker threads (default: from the config) |
+| `--adaptive [t]` | Stop sampling a pixel once its estimate has settled, up to `--samples` (default tolerance 0.02) |
 | `--denoise [n]` | Filter noise using surface colour and normals as a guide (default 5 passes). Applies to both saved images and the viewer |
 | `--denoise-strength <v>` | How much radiance difference the filter blurs across (default 0.10) |
 | `--headless` | Render once and exit without opening a window |
@@ -190,6 +191,42 @@ count.
 **Stratified samples.** Samples within a pixel are spread over a jittered grid rather than
 drawn independently, which would let them clump together and leave parts of the pixel
 uncovered.
+
+**Adaptive sampling** (`--adaptive`, off by default). Noise is not spread evenly across an
+image. A flat wall lit by one light settles in a handful of samples; a corner gathering
+light bounced from everywhere around it may still be moving after hundreds. Sampling both
+the same number of times spends most of the render refining pixels that stopped changing
+early on.
+
+Each pixel tracks the mean and variance of its own samples and stops once the standard
+error of that mean falls below `t` times its brightness, so the threshold is relative and
+dark regions are not held to a brighter region's absolute standard. Sixteen samples are
+taken before the test is applied at all, since a variance estimate from fewer than that is
+mostly noise itself, and every pixel is judged only on its own samples, which is what keeps
+the render independent of how the image was split across threads.
+
+What this is worth depends entirely on how uneven the scene is:
+
+| Scene | Fixed | Adaptive | Samples used |
+|---|---|---|---|
+| `bunny` (large flat floor and sky, detailed subject) | 84.3 s | **64.3 s** | 50% |
+| `cornell_box` (every pixel about equally difficult) | 3.23 s | 3.16 s | 86% |
+
+On the bunny that is a quarter of the render time for 7% more noise, or roughly 13% ahead
+once the extra noise is paid back in samples. On the Cornell box it is a wash, and honestly
+so: every pixel there is difficult, so there is nothing to stop early. Adaptive sampling
+does not make hard pixels cheaper, it only stops paying for easy ones, and a scene made
+entirely of hard pixels has none to skip. It is off by default for that reason.
+
+One subtlety worth recording. Early termination is incompatible with the jittered grid
+above, because the grid is filled in order: a pixel stopping after 16 of 484 cells has
+sampled a thin strip across its top rather than its area. The first version of this did
+exactly that, and the symptom was that the tolerance had no effect at all — 0.02 and 0.002
+gave the same noise and the same sample count, because the error was in coverage rather
+than in the stopping rule. The adaptive path uses a Halton sequence instead, which spreads
+evenly at *every* prefix length. Measured at matched sample counts the two are equivalent
+(9.80 vs 9.82 RMS at 64 spp), so the sequence is not itself an improvement; being able to
+stop anywhere is.
 
 ### Materials
 
@@ -419,5 +456,8 @@ and therefore continuous integration, possible.
   shapes still lights a scene correctly, through ordinary path tracing, but more noisily.
 - **Textures are not wired up.** Texture coordinates are loaded and interpolated and the
   sampling code exists, but no material reads from them yet.
-- **No adaptive sampling.** Every pixel gets the same number of samples, whether it
-  converged long ago or is still noisy.
+- **Adaptive sampling is per-pixel only.** Samples saved on an easy pixel are not
+  redistributed to a hard one, so a render finishes sooner rather than arriving at less
+  noise for the same time. Spending a shared budget where it does the most good would be
+  the stronger version, at the cost of the per-pixel independence that currently makes the
+  output identical regardless of thread count.

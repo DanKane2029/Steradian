@@ -1,6 +1,9 @@
 #pragma once
+#include <atomic>
 #include <cstdint>
+#include <algorithm>
 #include <memory>
+#include <utility>
 #include <mutex>
 
 #include "Camera.h"
@@ -67,6 +70,25 @@ class RayTracer
      */
     void renderRows(int yStart, int yEnd, unsigned int samplesPerPixel, uint64_t seed);
 
+    /**
+     * \brief Sets the point at which a pixel is considered converged.
+     *
+     * Zero renders every pixel with the full sample count. Above zero, a pixel stops once
+     * the uncertainty in its own estimate falls below this fraction of its brightness, so
+     * effort follows the noise instead of being spread evenly over an image whose
+     * difficulty is not.
+     */
+    void setAdaptiveTolerance(float tolerance)
+    {
+        m_AdaptiveTolerance = std::max(0.0f, tolerance);
+    }
+
+    /** samples actually taken during the last render, and the maximum that could have been */
+    auto lastSampleCount() const -> std::pair<uint64_t, uint64_t>
+    {
+        return {m_SamplesTaken.load(), m_SamplesPossible.load()};
+    }
+
     void updateAspectRatio(float aspectRatio);
 
   private:
@@ -94,6 +116,12 @@ class RayTracer
     auto makeCameraRay(float u, float v) -> Ray;
 
     unsigned int m_MaxDepth = 10;
+
+    /** relative uncertainty at which a pixel stops being sampled; zero disables it */
+    float m_AdaptiveTolerance = 0.0f;
+
+    std::atomic<uint64_t> m_SamplesTaken{0};
+    std::atomic<uint64_t> m_SamplesPossible{0};
 
     float m_aspectRatio{};
 

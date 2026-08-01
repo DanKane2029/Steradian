@@ -11,26 +11,39 @@ foreach(var RENDERER COMPARE CONFIG SCENE OUTPUT_DIR)
 endforeach()
 
 set(thread_counts 1 3 8)
+
+# Checked with adaptive sampling on as well as off. Adaptive is where this property is
+# most easily lost: how many samples a pixel takes is decided while rendering, so any
+# dependence on how the image was divided between threads would show up here as a
+# different image rather than as an obvious failure.
+foreach(mode "fixed" "adaptive")
 set(reference "")
 
+if(mode STREQUAL "adaptive")
+    set(extra_args --adaptive 0.02)
+else()
+    set(extra_args)
+endif()
+
 foreach(threads ${thread_counts})
-    set(output "${OUTPUT_DIR}/determinism_t${threads}.png")
+    set(output "${OUTPUT_DIR}/determinism_${mode}_t${threads}.png")
 
     execute_process(
         COMMAND "${RENDERER}"
                 --config "${CONFIG}"
                 --scene "${SCENE}"
                 --out "${output}"
-                --samples 4
+                --samples 32
                 --seed 1
                 --threads ${threads}
+                ${extra_args}
         RESULT_VARIABLE render_result
         OUTPUT_VARIABLE render_output
         ERROR_VARIABLE render_output
     )
 
     if(NOT render_result EQUAL 0)
-        message(FATAL_ERROR "Render with ${threads} thread(s) failed:\n${render_output}")
+        message(FATAL_ERROR "Render with ${threads} thread(s), ${mode}, failed:\n${render_output}")
     endif()
 
     if(reference STREQUAL "")
@@ -46,10 +59,11 @@ foreach(threads ${thread_counts})
 
         if(NOT compare_result EQUAL 0)
             message(FATAL_ERROR
-                "Render is not deterministic: 1 thread and ${threads} threads produced "
-                "different images.\n${compare_output}")
+                "Render is not deterministic with ${mode} sampling: 1 thread and "
+                "${threads} threads produced different images.\n${compare_output}")
         endif()
 
-        message(STATUS "1 vs ${threads} threads: identical")
+        message(STATUS "${mode}: 1 vs ${threads} threads identical")
     endif()
+endforeach()
 endforeach()
