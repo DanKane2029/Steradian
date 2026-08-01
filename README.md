@@ -149,7 +149,8 @@ cmake -B build -DPT_BUILD_VIEWER=OFF
 | `--samples <n>` | Samples per pixel for a headless render (default 16) |
 | `--seed <n>` | Base seed (default 1) |
 | `--threads <n>` | Worker threads (default: `numThreads` from the config) |
-| `--denoise [n]` | Filter noise from the saved image using surface colour and normals as a guide (default 5 passes) |
+| `--denoise [n]` | Filter noise using surface colour and normals as a guide (default 5 passes). Applies to both saved images and the viewer |
+| `--denoise-strength <v>` | How much radiance difference the filter blurs across (default 0.10) |
 | `--headless` | Render once and exit without opening a window |
 
 A headless render is **deterministic**: the same `--seed` and `--samples` produce a
@@ -213,6 +214,13 @@ steradian --config res/configs/test_config.json \
 ```
 
 Five passes over a 400x400 image take about 0.4 s.
+
+It applies to the viewer as well, where the filtered image is refreshed while the camera
+is still and skipped while it is moving, since a view about to be replaced does not
+benefit from being cleaned up. The refresh interval is derived from how long the previous
+run took, so the filter stays roughly a quarter of the frame budget whatever the
+resolution: a fixed interval works at small sizes and collapses the frame rate at large
+ones, where a single pass can take longer than the interval itself.
 
 **Measured**, against a 4000-sample reference at 32 samples per pixel:
 
