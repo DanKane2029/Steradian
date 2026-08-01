@@ -5,6 +5,15 @@
 # committed reference image. This is the safety net for the acceleration-structure and
 # integrator work: those changes must not alter the image, and this is what proves it.
 
+# Placement maths, and above all the normal transform. A normal scaled like a point stops
+# being perpendicular to its surface, which produces wrong shading that looks entirely
+# plausible in an image, so it needs checking numerically rather than by eye.
+add_executable(transform_test transform_test.cpp)
+target_link_libraries(transform_test PRIVATE pt_core pt_warnings)
+
+add_test(NAME transform COMMAND transform_test)
+set_tests_properties(transform PROPERTIES TIMEOUT 60)
+
 add_executable(image_compare image_compare.cpp)
 target_link_libraries(image_compare PRIVATE pt_core pt_warnings)
 
