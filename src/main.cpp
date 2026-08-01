@@ -4,6 +4,7 @@
 #include "Utils/ImageIO.h"
 #include "Utils/Random.h"
 #include "Utils/Stats.h"
+#include "Utils/ThreadPool.h"
 #include "Window/PixelBuffer.h"
 
 #ifdef PT_HAVE_VIEWER
@@ -154,37 +155,24 @@ auto parseArgs(int argc, char *argv[]) -> Options
  * per thread, which is what keeps the result identical no matter how many threads are
  * used.
  */
-void renderHeadless(RayTracer &rayTracer, PixelBuffer &pixelBuffer, const Options &options, unsigned int numThreads)
+void renderHeadless(RayTracer &rayTracer, PixelBuffer &pixelBuffer, const Options &options, ThreadPool &pool)
 {
     const auto size = pixelBuffer.getSize();
     const int height = size.second;
 
-    const unsigned int workerCount = std::max(1U, std::min(numThreads, static_cast<unsigned int>(height)));
+    // Work is handed out in small bands rather than one equal share per thread. Bands
+    // differ enormously in cost -- empty background is far cheaper than a band full of
+    // geometry -- so a static division leaves most threads waiting on the slowest one.
+    // Claiming bands dynamically keeps every worker busy until the frame is done.
+    constexpr int rowsPerBand = 8;
+    const auto bandCount = static_cast<uint32_t>((height + rowsPerBand - 1) / rowsPerBand);
 
-    std::vector<std::thread> workers;
-    workers.reserve(workerCount);
+    pool.parallelFor(bandCount, [&](uint32_t band) {
+        const int yStart = static_cast<int>(band) * rowsPerBand;
+        const int yEnd = std::min(yStart + rowsPerBand, height);
 
-    const int rowsPerWorker = (height + static_cast<int>(workerCount) - 1) / static_cast<int>(workerCount);
-
-    for (unsigned int w = 0; w < workerCount; w++)
-    {
-        const int yStart = static_cast<int>(w) * rowsPerWorker;
-        const int yEnd = std::min(yStart + rowsPerWorker, height);
-
-        if (yStart >= yEnd)
-        {
-            break;
-        }
-
-        workers.emplace_back([&rayTracer, yStart, yEnd, &options]() {
-            rayTracer.renderRows(yStart, yEnd, options.samplesPerPixel, options.seed);
-        });
-    }
-
-    for (std::thread &worker : workers)
-    {
-        worker.join();
-    }
+        rayTracer.renderRows(yStart, yEnd, options.samplesPerPixel, options.seed);
+    });
 }
 
 } // namespace
@@ -234,8 +222,10 @@ auto main(int argc, char *argv[]) -> int
                       << options.samplesPerPixel << " spp on " << numThreads << " thread(s), seed " << options.seed
                       << "..." << std::endl;
 
+            ThreadPool pool(numThreads);
+
             const auto start = std::chrono::steady_clock::now();
-            renderHeadless(rayTracer, pixelBuffer, options, numThreads);
+            renderHeadless(rayTracer, pixelBuffer, options, pool);
             const auto end = std::chrono::steady_clock::now();
 
             const double seconds = std::chrono::duration<double>(end - start).count();

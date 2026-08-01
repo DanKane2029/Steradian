@@ -1,152 +1,385 @@
 #include "BVH.h"
 
+#include "Utils/Stats.h"
+
+#include <algorithm>
+#include <array>
 #include <cmath>
+#include <iostream>
 
-/**
- * creates an actree bounding volume heirarchy
- *
- * \param objectList - the list of objects that make up the BVH
- */
-BVH::BVH(std::vector<std::shared_ptr<SceneObject>> objectList, unsigned int objectsInLeaf)
-    : m_OjectList(objectList), m_ObjectsInLeaf(objectsInLeaf)
+BVH::BVH(const std::vector<std::shared_ptr<SceneObject>> &objectList, unsigned int objectsInLeaf)
+    : m_ObjectsInLeaf(std::max(1U, objectsInLeaf))
 {
-    std::cout << "Creating Acceleration Structure from " << objectList.size() << " objects." << std::endl;
-    root = std::make_shared<BVHNode>();
-    partitionSpace(root, m_OjectList);
+    std::cout << "Building BVH over " << objectList.size() << " primitives." << std::endl;
+
+    m_Primitives.reserve(objectList.size());
+    m_PrimBounds.reserve(objectList.size());
+    m_PrimCentroids.reserve(objectList.size());
+
+    for (const std::shared_ptr<SceneObject> &object : objectList)
+    {
+        AABB bounds;
+        bounds.expand(Vec3(object->getMinX(), object->getMinY(), object->getMinZ()));
+        bounds.expand(Vec3(object->getMaxX(), object->getMaxY(), object->getMaxZ()));
+
+        m_Primitives.push_back(object.get());
+        m_PrimBounds.push_back(bounds);
+        m_PrimCentroids.push_back(bounds.centroid());
+    }
+
+    if (m_Primitives.empty())
+    {
+        return;
+    }
+
+    // A balanced hierarchy over n primitives needs about 2n-1 nodes.
+    m_Nodes.reserve((2 * m_Primitives.size()) + 1);
+
+    buildNode(0, m_Primitives.size(), 0);
+
+    // The per-primitive caches are only needed during the build.
+    m_PrimBounds.clear();
+    m_PrimBounds.shrink_to_fit();
+    m_PrimCentroids.clear();
+    m_PrimCentroids.shrink_to_fit();
+
+    std::cout << "  " << m_Nodes.size() << " nodes, max depth " << m_MaxDepth << std::endl;
 }
 
-/**
- * splits a list of scene objects into 8 axis aligned bounding boxes
- * the bounding boxes are split along axises that are the medians x, y, & z
- * values of the center points of the scene objects
- *
- * \param objectList - the vector of scene objects the split
- * \param partitionedSpaces - the list of
- */
-void BVH::partitionSpace(std::shared_ptr<BVHNode> node, std::vector<std::shared_ptr<SceneObject>> objectList)
+auto BVH::boundsOf(size_t start, size_t end) const -> AABB
 {
-    if (objectList.size() <= m_ObjectsInLeaf)
+    AABB bounds;
+
+    for (size_t i = start; i < end; i++)
     {
-        // stop recursion
-        node->isLeaf = true;
-        node->sceneObjects = objectList;
+        bounds.expand(m_PrimBounds[i]);
     }
-    else
-    {
-        node->boundingBox = encapsulateObjects(objectList);
 
-        std::vector<Vec3> centerPoints;
-        std::transform(objectList.begin(), objectList.end(), std::back_inserter(centerPoints),
-                       [](std::shared_ptr<SceneObject> sceneObject) { return sceneObject->getCenterPoint(); });
-
-        // get medians in x direction
-        std::sort(centerPoints.begin(), centerPoints.end(), [](Vec3 v, Vec3 u) { return v.x < u.x; });
-        float xMedian = centerPoints[centerPoints.size() / 2].x;
-
-        // get medians in y direction
-        std::sort(centerPoints.begin(), centerPoints.end(), [](Vec3 v, Vec3 u) { return v.y < u.y; });
-        float yMedian = centerPoints[centerPoints.size() / 2].y;
-
-        // get medians in z direction
-        std::sort(centerPoints.begin(), centerPoints.end(), [](Vec3 v, Vec3 u) { return v.z < u.z; });
-        float zMedian = centerPoints[centerPoints.size() / 2].z;
-
-        node->children = std::vector<std::shared_ptr<BVHNode>>(8);
-
-        node->children[0] = std::make_shared<BVHNode>();
-        node->children[0]->boundingBox = BoundingBox(node->boundingBox.minX, xMedian, node->boundingBox.minY, yMedian,
-                                                     node->boundingBox.minZ, zMedian);
-
-        node->children[1] = std::make_shared<BVHNode>();
-        node->children[1]->boundingBox = BoundingBox(xMedian, node->boundingBox.maxX, node->boundingBox.minY, yMedian,
-                                                     node->boundingBox.minZ, zMedian);
-
-        node->children[2] = std::make_shared<BVHNode>();
-        node->children[2]->boundingBox = BoundingBox(node->boundingBox.minX, xMedian, yMedian, node->boundingBox.maxY,
-                                                     node->boundingBox.minZ, zMedian);
-
-        node->children[3] = std::make_shared<BVHNode>();
-        node->children[3]->boundingBox = BoundingBox(xMedian, node->boundingBox.maxX, yMedian, node->boundingBox.maxY,
-                                                     node->boundingBox.minZ, zMedian);
-
-        node->children[4] = std::make_shared<BVHNode>();
-        node->children[4]->boundingBox = BoundingBox(node->boundingBox.minX, xMedian, node->boundingBox.minY, yMedian,
-                                                     zMedian, node->boundingBox.maxZ);
-
-        node->children[5] = std::make_shared<BVHNode>();
-        node->children[5]->boundingBox = BoundingBox(xMedian, node->boundingBox.maxX, node->boundingBox.minY, yMedian,
-                                                     zMedian, node->boundingBox.maxZ);
-
-        node->children[6] = std::make_shared<BVHNode>();
-        node->children[6]->boundingBox = BoundingBox(node->boundingBox.minX, xMedian, yMedian, node->boundingBox.maxY,
-                                                     zMedian, node->boundingBox.maxZ);
-
-        node->children[7] = std::make_shared<BVHNode>();
-        node->children[7]->boundingBox = BoundingBox(xMedian, node->boundingBox.maxX, yMedian, node->boundingBox.maxY,
-                                                     zMedian, node->boundingBox.maxZ);
-
-        std::vector<std::shared_ptr<SceneObject>> filteredObjectList;
-        for (std::shared_ptr<BVHNode> child : node->children)
-        {
-            filteredObjectList = filterObjects(child, objectList);
-            partitionSpace(child, child->sceneObjects);
-        }
-    }
+    return bounds;
 }
 
-auto BVH::filterObjects(std::shared_ptr<BVHNode> node, std::vector<std::shared_ptr<SceneObject>> objectList)
-    -> std::vector<std::shared_ptr<SceneObject>>
+auto BVH::findSplit(size_t start, size_t end, const AABB &centroidBounds, int &axis, size_t &splitIndex) -> bool
 {
-    std::vector<std::shared_ptr<SceneObject>> filteredObjectList;
-    for (std::shared_ptr<SceneObject> object : objectList)
+    const size_t count = end - start;
+
+    axis = centroidBounds.maxExtentAxis();
+
+    const float extent = AABB::axisValue(centroidBounds.extent(), axis);
+    if (extent <= 0.0f)
     {
-        Vec3 centerPoint = object->getCenterPoint();
-        if (node->boundingBox.inside(centerPoint))
+        // Every centroid coincides along the widest axis, so no split plane separates
+        // them. Falling through to a median partition keeps the recursion terminating.
+        return false;
+    }
+
+    const float lower = AABB::axisValue(centroidBounds.min, axis);
+    const float scale = static_cast<float>(numBuckets) / extent;
+
+    struct Bucket
+    {
+        size_t count = 0;
+        AABB bounds;
+    };
+
+    std::array<Bucket, numBuckets> buckets;
+
+    const auto bucketOf = [&](size_t i) {
+        const float offset = AABB::axisValue(m_PrimCentroids[i], axis) - lower;
+        const auto b = static_cast<int>(offset * scale);
+        return std::min(std::max(b, 0), numBuckets - 1);
+    };
+
+    for (size_t i = start; i < end; i++)
+    {
+        Bucket &bucket = buckets[bucketOf(i)];
+        bucket.count++;
+        bucket.bounds.expand(m_PrimBounds[i]);
+    }
+
+    // Sweep from both ends so each candidate split's two halves are known in linear time.
+    std::array<float, numBuckets - 1> leftArea{};
+    std::array<size_t, numBuckets - 1> leftCount{};
+    {
+        AABB acc;
+        size_t n = 0;
+        for (int i = 0; i < numBuckets - 1; i++)
         {
-            node->sceneObjects.push_back(object);
-        }
-        else
-        {
-            filteredObjectList.push_back(object);
+            acc.expand(buckets[i].bounds);
+            n += buckets[i].count;
+            leftArea[i] = acc.surfaceArea();
+            leftCount[i] = n;
         }
     }
 
-    return filteredObjectList;
-}
-
-/**
- * encasulates a list of scene objects into a bounding box by finding the
- * minimum and maximum x, y, & z values of their own bounding boxes
- *
- * \param objectList - the list of scene objects to encapsulate
- * \return - the bounding box encapsulating the scene objects
- */
-auto BVH::encapsulateObjects(std::vector<std::shared_ptr<SceneObject>> objectList) -> BoundingBox
-{
-    // lowest(), not min(): min() is the smallest positive normal, so seeding the maxima
-    // with it produced boxes that were wrong for geometry in negative coordinates.
-    const float floatMin = std::numeric_limits<float>::lowest();
-    const float floatMax = std::numeric_limits<float>::max();
-
-    float minX = floatMax;
-    float minY = floatMax;
-    float minZ = floatMax;
-
-    float maxX = floatMin;
-    float maxY = floatMin;
-    float maxZ = floatMin;
-
-    // Get bounding box of each scene object to find bounding box of all objects
-    for (std::shared_ptr<SceneObject> so : objectList)
+    float bestCost = std::numeric_limits<float>::max();
+    int bestSplit = -1;
     {
-        minX = std::min(minX, so->getMinX());
-        minY = std::min(minY, so->getMinY());
-        minZ = std::min(minZ, so->getMinZ());
+        AABB acc;
+        size_t n = 0;
+        for (int i = numBuckets - 1; i > 0; i--)
+        {
+            acc.expand(buckets[i].bounds);
+            n += buckets[i].count;
 
-        maxX = std::max(maxX, so->getMaxX());
-        maxY = std::max(maxY, so->getMaxY());
-        maxZ = std::max(maxZ, so->getMaxZ());
+            const size_t nLeft = leftCount[i - 1];
+            if (nLeft == 0 || n == 0)
+            {
+                continue;
+            }
+
+            // Surface area heuristic: the expected cost of a split is the chance a ray
+            // enters each child, proportional to its surface area, times the work it
+            // would do there.
+            const float cost =
+                (leftArea[i - 1] * static_cast<float>(nLeft)) + (acc.surfaceArea() * static_cast<float>(n));
+
+            if (cost < bestCost)
+            {
+                bestCost = cost;
+                bestSplit = i;
+            }
+        }
     }
 
-    return {minX, maxX, minY, maxY, minZ, maxZ};
+    if (bestSplit < 0)
+    {
+        return false;
+    }
+
+    const AABB nodeBounds = boundsOf(start, end);
+    const float parentArea = nodeBounds.surfaceArea();
+
+    // Compare against simply making a leaf. Normalizing by the parent's area turns the
+    // accumulated areas above into probabilities.
+    const float splitCost = traversalCost + (parentArea > 0.0f ? bestCost / parentArea : bestCost);
+    const auto leafCost = static_cast<float>(count);
+
+    if (count <= m_ObjectsInLeaf && leafCost <= splitCost)
+    {
+        return false;
+    }
+
+    // Partition in place, keeping the parallel bounds and centroid arrays in step, so
+    // each child ends up owning a contiguous range and no allocation happens per node.
+    size_t mid = start;
+    for (size_t i = start; i < end; i++)
+    {
+        if (bucketOf(i) < bestSplit)
+        {
+            if (i != mid)
+            {
+                std::swap(m_Primitives[i], m_Primitives[mid]);
+                std::swap(m_PrimBounds[i], m_PrimBounds[mid]);
+                std::swap(m_PrimCentroids[i], m_PrimCentroids[mid]);
+            }
+            mid++;
+        }
+    }
+
+    // A split that leaves one side empty makes no progress and would recurse forever.
+    if (mid == start || mid == end)
+    {
+        return false;
+    }
+
+    splitIndex = mid;
+    return true;
+}
+
+auto BVH::buildNode(size_t start, size_t end, unsigned int depth) -> uint32_t
+{
+    m_MaxDepth = std::max(m_MaxDepth, depth);
+
+    const auto nodeIndex = static_cast<uint32_t>(m_Nodes.size());
+    m_Nodes.emplace_back();
+
+    const size_t count = end - start;
+
+    // Bounds are taken from the primitives the node actually contains, not from a spatial
+    // subdivision of the parent. The previous octree used partition planes as node bounds
+    // while assigning primitives by centroid, so a primitive straddling a plane stuck out
+    // of its own node's box.
+    AABB nodeBounds = boundsOf(start, end);
+
+    const auto makeLeaf = [&]() {
+        BVHNode &node = m_Nodes[nodeIndex];
+        node.bounds = nodeBounds;
+        node.rightOrFirst = static_cast<uint32_t>(start);
+        node.count = static_cast<uint16_t>(std::min<size_t>(count, std::numeric_limits<uint16_t>::max()));
+        node.axis = 0;
+    };
+
+    if (count <= 1 || depth >= maxBuildDepth)
+    {
+        makeLeaf();
+        return nodeIndex;
+    }
+
+    AABB centroidBounds;
+    for (size_t i = start; i < end; i++)
+    {
+        centroidBounds.expand(m_PrimCentroids[i]);
+    }
+
+    int axis = 0;
+    size_t splitIndex = 0;
+
+    if (!findSplit(start, end, centroidBounds, axis, splitIndex))
+    {
+        // No worthwhile split. Fall back to a median partition when the range is still
+        // too large for one leaf, so degenerate geometry cannot produce a huge leaf.
+        if (count <= m_ObjectsInLeaf)
+        {
+            makeLeaf();
+            return nodeIndex;
+        }
+
+        splitIndex = start + (count / 2);
+        axis = centroidBounds.maxExtentAxis();
+    }
+
+    const uint32_t leftIndex = buildNode(start, splitIndex, depth + 1);
+    (void)leftIndex; // always nodeIndex + 1 by construction
+
+    const uint32_t rightIndex = buildNode(splitIndex, end, depth + 1);
+
+    BVHNode &node = m_Nodes[nodeIndex];
+    node.bounds = nodeBounds;
+    node.rightOrFirst = rightIndex;
+    node.count = 0;
+    node.axis = static_cast<uint8_t>(axis);
+
+    return nodeIndex;
+}
+
+auto BVH::intersect(Ray ray) const -> Hit
+{
+    Hit closest;
+
+    if (m_Nodes.empty())
+    {
+        return closest;
+    }
+
+    const Vec3 invDir(1.0f / ray.dir.x, 1.0f / ray.dir.y, 1.0f / ray.dir.z);
+    const bool dirIsNeg[3] = {invDir.x < 0.0f, invDir.y < 0.0f, invDir.z < 0.0f};
+
+    std::array<uint32_t, maxBuildDepth + 8> stack{};
+    int stackSize = 0;
+    uint32_t current = 0;
+
+    while (true)
+    {
+        const BVHNode &node = m_Nodes[current];
+
+        Stats::countNodeVisit();
+
+        float tNear = 0.0f;
+        if (node.bounds.intersect(ray.org, invDir, ray.tMin, ray.tMax, tNear))
+        {
+            if (node.isLeaf())
+            {
+                for (uint16_t i = 0; i < node.count; i++)
+                {
+                    Stats::countPrimitiveTest();
+
+                    const Hit hit = m_Primitives[node.rightOrFirst + i]->rayIntersect(ray);
+
+                    if (hit.isHit && hit.time < ray.tMax)
+                    {
+                        closest = hit;
+
+                        // Shrinking the ray's far bound is what makes traversal cheap:
+                        // every later box and primitive test is now bounded by the best
+                        // hit found so far.
+                        ray.tMax = hit.time;
+                    }
+                }
+            }
+            else
+            {
+                // Visit the nearer child first so the far one is often culled by the
+                // tightened tMax before it is ever reached.
+                const uint32_t left = current + 1;
+                const uint32_t right = node.rightOrFirst;
+
+                if (dirIsNeg[node.axis])
+                {
+                    stack[stackSize++] = left;
+                    current = right;
+                }
+                else
+                {
+                    stack[stackSize++] = right;
+                    current = left;
+                }
+
+                continue;
+            }
+        }
+
+        if (stackSize == 0)
+        {
+            break;
+        }
+
+        current = stack[--stackSize];
+    }
+
+    return closest;
+}
+
+auto BVH::isOccluded(const Ray &ray) const -> bool
+{
+    if (m_Nodes.empty())
+    {
+        return false;
+    }
+
+    const Vec3 invDir(1.0f / ray.dir.x, 1.0f / ray.dir.y, 1.0f / ray.dir.z);
+
+    std::array<uint32_t, maxBuildDepth + 8> stack{};
+    int stackSize = 0;
+    uint32_t current = 0;
+
+    while (true)
+    {
+        const BVHNode &node = m_Nodes[current];
+
+        Stats::countNodeVisit();
+
+        float tNear = 0.0f;
+        if (node.bounds.intersect(ray.org, invDir, ray.tMin, ray.tMax, tNear))
+        {
+            if (node.isLeaf())
+            {
+                for (uint16_t i = 0; i < node.count; i++)
+                {
+                    Stats::countPrimitiveTest();
+
+                    // Any intersection blocks the light, so there is no reason to keep
+                    // looking for the closest one.
+                    if (m_Primitives[node.rightOrFirst + i]->rayIntersect(ray).isHit)
+                    {
+                        return true;
+                    }
+                }
+            }
+            else
+            {
+                stack[stackSize++] = node.rightOrFirst;
+                current = current + 1;
+                continue;
+            }
+        }
+
+        if (stackSize == 0)
+        {
+            break;
+        }
+
+        current = stack[--stackSize];
+    }
+
+    return false;
 }

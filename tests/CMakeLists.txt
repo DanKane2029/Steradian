@@ -8,6 +8,25 @@
 add_executable(image_compare image_compare.cpp)
 target_link_libraries(image_compare PRIVATE pt_core pt_warnings)
 
+# Checks the acceleration structure against a brute force scan. Golden images prove the
+# final picture is unchanged; this proves the structure itself returns exactly the hits a
+# linear search would, which is the property the previous octree quietly violated.
+add_executable(bvh_consistency bvh_consistency.cpp)
+target_link_libraries(bvh_consistency PRIVATE pt_core pt_warnings)
+
+# Ray counts are per scene because the brute force reference, not the BVH, sets the cost:
+# it is O(rays * primitives), so the 48,918 triangle scene gets proportionally fewer rays
+# to keep the suite quick.
+foreach(scene_and_rays "two_spheres:20000" "test_obj_ball:20000" "test_man_obj:2000")
+    string(REPLACE ":" ";" parts ${scene_and_rays})
+    list(GET parts 0 scene)
+    list(GET parts 1 rays)
+
+    add_test(NAME bvh.${scene}
+        COMMAND bvh_consistency ${CMAKE_SOURCE_DIR}/res/scenes/${scene}.json ${rays})
+    set_tests_properties(bvh.${scene} PROPERTIES TIMEOUT 300)
+endforeach()
+
 # Scenes kept deliberately small so the whole suite runs in a few seconds. Mesh scenes
 # are slow until the BVH actually culls, so only the cheapest mesh is included for now.
 set(GOLDEN_SCENES
@@ -15,6 +34,9 @@ set(GOLDEN_SCENES
     single_triangle
     two_spheres
     test_obj_ball
+    # 48,918 triangles. Only affordable as a test since the BVH started culling: this
+    # scene took over a minute per render before, and now takes a fraction of a second.
+    test_man_obj
 )
 
 set(GOLDEN_SAMPLES 4)

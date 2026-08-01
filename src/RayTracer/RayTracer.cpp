@@ -117,7 +117,7 @@ auto RayTracer::shootRay(Ray ray) -> Hit
 {
     Stats::countRay();
 
-    Hit hit = m_Scene->getAccelerationStructure()->root->rayIntersect(ray);
+    Hit hit = m_Scene->getAccelerationStructure()->intersect(ray);
     hit.ray = ray;
     return hit;
 }
@@ -224,7 +224,10 @@ auto RayTracer::shootShadowRays(const std::shared_ptr<Light> &light, Vec3 pos, V
         // turns a closest-hit search into an occlusion test.
         Ray shadowRay(origin, shadowDir, Ray::defaultEpsilon, lightDist - Ray::defaultEpsilon);
 
-        if (!shootRay(shadowRay).isHit)
+        // An occlusion query, not a closest-hit search: a shadow ray only needs to know
+        // whether anything is in the way, so traversal can stop at the first hit.
+        Stats::countRay();
+        if (!m_Scene->getAccelerationStructure()->isOccluded(shadowRay))
         {
             litSources++;
         }
