@@ -1,5 +1,6 @@
 #include "Integrator.h"
 
+#include "Utils/Microfacet.h"
 #include "Utils/Sampling.h"
 #include "Utils/Stats.h"
 
@@ -15,7 +16,50 @@ constexpr unsigned int russianRouletteStart = 3;
 /** largest survival probability used by Russian roulette */
 constexpr float maxSurvivalProbability = 0.95f;
 
+/**
+ * \brief Combines two sampling strategies by the balance heuristic.
+ *
+ * Given the densities the two strategies assign to the same direction, this is the share
+ * of the estimate that should come from the first. It is the weighting that minimises
+ * variance among all combinations that keep the estimator unbiased, and it has an
+ * intuitive reading: whichever strategy was more likely to have produced this particular
+ * direction is trusted more for it.
+ */
+auto misWeight(float pdfA, float pdfB) -> float
+{
+    const float total = pdfA + pdfB;
+    return (total > 0.0f) ? (pdfA / total) : 0.0f;
+}
+
 } // namespace
+
+auto Integrator::lightPdf(const Vec3 &from, int emitterIndex) const -> float
+{
+    const std::vector<Scene::Emitter> &emitters = m_Scene->getEmitters();
+
+    if (emitterIndex < 0 || static_cast<size_t>(emitterIndex) >= emitters.size())
+    {
+        return 0.0f;
+    }
+
+    const Scene::Emitter &emitter = emitters[static_cast<size_t>(emitterIndex)];
+
+    const Vec3 toCenter = emitter.center - from;
+    const float centerDistanceSquared = toCenter.lengthSquared();
+    const float radiusSquared = emitter.radius * emitter.radius;
+
+    // Inside the emitter there is no cone to sample, so light sampling could not have
+    // produced this direction at all.
+    if (centerDistanceSquared <= radiusSquared)
+    {
+        return 0.0f;
+    }
+
+    const float cosThetaMax = std::sqrt(std::max(0.0f, 1.0f - (radiusSquared / centerDistanceSquared)));
+    const float selectionPdf = 1.0f / static_cast<float>(emitters.size());
+
+    return selectionPdf / (2.0f * Sampling::pi * (1.0f - cosThetaMax));
+}
 
 auto Integrator::background(const Vec3 &direction) const -> Vec3
 {
@@ -27,13 +71,15 @@ auto Integrator::background(const Vec3 &direction) const -> Vec3
     return m_Scene->getAmbientLighting();
 }
 
-auto Integrator::sampleDirectLighting(const Hit &hit, const Material &material, const Vec3 &albedo,
+auto Integrator::sampleDirectLighting(const Hit &hit, const Material &material, const Vec3 &albedo, const Vec3 &viewDir,
                                       Rng &rng) const -> Vec3
 {
-    // Only diffuse surfaces gather light this way. A mirror reflects exactly one
-    // direction, so a randomly chosen point on a light almost never lies along it, and
-    // the contribution would be zero with probability one.
-    if (material.type != Material::Type::Diffuse)
+    // A mirror, or a smooth conductor, reflects exactly one direction. A point chosen on
+    // a light almost never lies along it, so the contribution would be zero with
+    // probability one and there is nothing to gain from trying.
+    const bool isGlossy = material.type == Material::Type::Metal && material.roughness >= Microfacet::smoothThreshold;
+
+    if (material.type != Material::Type::Diffuse && !isGlossy)
     {
         return {};
     }
@@ -111,10 +157,49 @@ auto Integrator::sampleDirectLighting(const Hit &hit, const Material &material, 
         return {};
     }
 
-    // Lambertian BRDF is albedo / pi.
-    const Vec3 brdf = albedo / Sampling::pi;
+    Vec3 brdf;
+    float bsdfPdf = 0.0f;
 
-    return emitter.emission * brdf * (nDotL / pdfSolidAngle);
+    if (isGlossy)
+    {
+        const float alpha = Microfacet::roughnessToAlpha(material.roughness);
+
+        Vec3 t;
+        Vec3 b;
+        Sampling::buildBasis(hit.normal, t, b);
+
+        const Vec3 woLocal = Vec3(viewDir.dot(t), viewDir.dot(b), viewDir.dot(hit.normal));
+        const Vec3 wiLocal = Vec3(wi.dot(t), wi.dot(b), wi.dot(hit.normal));
+
+        if (woLocal.z <= 0.0f)
+        {
+            return {};
+        }
+
+        const Vec3 h = (woLocal + wiLocal).normalized();
+        const float cosThetaD = std::max(0.0f, woLocal.dot(h));
+
+        const Vec3 fresnel(Sampling::fresnelSchlick(cosThetaD, albedo.x), Sampling::fresnelSchlick(cosThetaD, albedo.y),
+                           Sampling::fresnelSchlick(cosThetaD, albedo.z));
+
+        brdf = fresnel * Microfacet::evaluate(woLocal, wiLocal, alpha);
+        bsdfPdf = Microfacet::pdf(woLocal, wiLocal, alpha);
+    }
+    else
+    {
+        // Lambertian BRDF is albedo / pi.
+        brdf = albedo / Sampling::pi;
+        bsdfPdf = nDotL / Sampling::pi;
+    }
+
+    // Weight this estimate against what scattering would have done. Light sampling is
+    // excellent for a small distant source and poor for one that fills the sky; BSDF
+    // sampling is the reverse, and for a glossy surface it is far better still. Weighting
+    // by the balance heuristic takes the better of the two everywhere without having to
+    // decide in advance which case a scene is in.
+    const float weight = misWeight(pdfSolidAngle, bsdfPdf);
+
+    return emitter.emission * brdf * (nDotL / pdfSolidAngle) * weight;
 }
 
 auto Integrator::radiance(Ray ray, Rng &rng) const -> Vec3
@@ -127,6 +212,12 @@ auto Integrator::radiance(Ray ray, Rng &rng) const -> Vec3
     // specular surface. Adding it after a diffuse bounce as well would count the same
     // light twice, since sampleDirectLighting already gathered it.
     bool countEmission = true;
+
+    // The multiple importance sampling weight for emission reached by scattering depends
+    // on where the scattering happened and how likely that direction was, so both have to
+    // survive to the next iteration.
+    Vec3 previousPosition{};
+    float previousBsdfPdf = 0.0f;
 
     for (unsigned int depth = 0; depth <= m_MaxDepth; depth++)
     {
@@ -144,19 +235,27 @@ auto Integrator::radiance(Ray ray, Rng &rng) const -> Vec3
 
         if (material.isEmissive())
         {
-            // Emission counts unless direct light sampling already accounted for it.
-            // That is only true for surfaces registered as sampled emitters: emissive
-            // geometry of other shapes is never picked by sampleDirectLighting, so
-            // suppressing it here would lose its contribution entirely.
-            const bool alreadySampled = !countEmission && hit.emitterIndex >= 0;
+            // How much of this emission belongs to the path that scattered into it.
+            //
+            // Previously this contribution was discarded whenever direct light sampling
+            // could also have found the surface, which avoided double counting but threw
+            // away a perfectly good estimate. Weighting the two instead keeps both, and
+            // the weights sum to one so the result stays unbiased.
+            float weight = 1.0f;
 
-            if (!alreadySampled)
+            if (!countEmission && hit.emitterIndex >= 0)
             {
-                radiance += throughput * material.emissive;
+                const float pdfLight = lightPdf(previousPosition, hit.emitterIndex);
+                weight = misWeight(previousBsdfPdf, pdfLight);
             }
+
+            radiance += throughput * material.emissive * weight;
         }
 
-        radiance += throughput * sampleDirectLighting(hit, material, albedo, rng);
+        // The view direction points back along the ray, away from the surface.
+        const Vec3 viewDir = -ray.dir;
+
+        radiance += throughput * sampleDirectLighting(hit, material, albedo, viewDir, rng);
 
         // Choose the next direction, and update throughput by the scattering weight,
         // which is the BRDF times the cosine divided by the density it was sampled from.
@@ -184,34 +283,79 @@ auto Integrator::radiance(Ray ray, Rng &rng) const -> Vec3
             // just the albedo. That cancellation is the reason for sampling this way.
             throughput *= albedo;
 
+            previousBsdfPdf = pdf;
             countEmission = false;
             nextOrigin = Ray::offsetOrigin(hit.position, hit.normal);
             break;
         }
 
         case Material::Type::Metal: {
-            const Vec3 reflected = Sampling::reflect(ray.dir, hit.normal);
-
-            // Roughness perturbs the mirror direction. Squaring it gives a control that
-            // feels more even across its range.
-            Vec3 scattered = reflected;
-            if (material.roughness > 0.0f)
+            // A mirror reflects one direction exactly, so there is no distribution to
+            // sample and no density to weigh against anything.
+            if (material.roughness < Microfacet::smoothThreshold)
             {
-                const float spread = material.roughness * material.roughness;
-                scattered = (reflected + (Sampling::uniformSphere(rng) * spread)).normalized();
+                const Vec3 reflected = Sampling::reflect(ray.dir, hit.normal);
+
+                if (reflected.dot(hit.normal) <= 0.0f)
+                {
+                    return radiance;
+                }
+
+                nextDirection = reflected;
+                throughput *= albedo;
+
+                countEmission = true;
+                nextOrigin = Ray::offsetOrigin(hit.position, hit.normal);
+                break;
             }
 
-            // A perturbation can push the direction below the surface; absorb there
-            // rather than letting the path continue through the geometry.
-            if (scattered.dot(hit.normal) <= 0.0f)
+            const float alpha = Microfacet::roughnessToAlpha(material.roughness);
+
+            Vec3 t;
+            Vec3 b;
+            Sampling::buildBasis(hit.normal, t, b);
+
+            // Work in the local frame, where the surface normal is +Z and the
+            // distribution is expressed most simply.
+            const Vec3 woLocal = Vec3(-ray.dir.dot(t), -ray.dir.dot(b), -ray.dir.dot(hit.normal));
+
+            if (woLocal.z <= 0.0f)
             {
                 return radiance;
             }
 
-            nextDirection = scattered;
-            throughput *= albedo;
+            const Vec3 h = Microfacet::sampleVisibleNormal(woLocal, alpha, rng.nextFloat(), rng.nextFloat());
+            const Vec3 wiLocal = Sampling::reflect(-woLocal, h);
 
-            countEmission = true;
+            // A facet can reflect the view below the surface, where the path cannot
+            // continue. Those directions are absorbed, which is the physical outcome of
+            // the microfacet being shadowed by its neighbours.
+            if (wiLocal.z <= 0.0f)
+            {
+                return radiance;
+            }
+
+            const float weight = Microfacet::visibleNormalWeight(woLocal, wiLocal, alpha);
+            if (weight <= 0.0f)
+            {
+                return radiance;
+            }
+
+            // Fresnel with the surface tint as the reflectance at normal incidence, which
+            // is the usual way to describe a conductor.
+            const float cosThetaD = std::max(0.0f, woLocal.dot(h));
+            const Vec3 fresnel(Sampling::fresnelSchlick(cosThetaD, albedo.x),
+                               Sampling::fresnelSchlick(cosThetaD, albedo.y),
+                               Sampling::fresnelSchlick(cosThetaD, albedo.z));
+
+            throughput *= fresnel * weight;
+
+            nextDirection = Sampling::toWorld(wiLocal, t, b, hit.normal);
+            previousBsdfPdf = Microfacet::pdf(woLocal, wiLocal, alpha);
+
+            // A rough surface has a real density, so emission it scatters into can be
+            // weighed against direct light sampling rather than being taken whole.
+            countEmission = false;
             nextOrigin = Ray::offsetOrigin(hit.position, hit.normal);
             break;
         }
@@ -265,6 +409,8 @@ auto Integrator::radiance(Ray ray, Rng &rng) const -> Vec3
 
             throughput /= survival;
         }
+
+        previousPosition = hit.position;
 
         ray = Ray(nextOrigin, nextDirection);
     }

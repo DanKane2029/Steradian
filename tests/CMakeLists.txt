@@ -20,6 +20,13 @@ target_link_libraries(furnace PRIVATE pt_core pt_warnings)
 add_test(NAME furnace COMMAND furnace ${CMAKE_CURRENT_SOURCE_DIR}/furnace_scene.json 20000)
 set_tests_properties(furnace PROPERTIES TIMEOUT 300)
 
+# The same check for a rough conductor. Single-scattering GGX loses energy as roughness
+# rises, because light bouncing more than once between microfacets is not modelled, so
+# this uses a low roughness where that loss is still under a percent. It covers the
+# microfacet sampling weight, which the diffuse furnace never touches.
+add_test(NAME furnace.metal COMMAND furnace ${CMAKE_CURRENT_SOURCE_DIR}/furnace_metal_scene.json 20000)
+set_tests_properties(furnace.metal PROPERTIES TIMEOUT 300)
+
 add_executable(bvh_consistency bvh_consistency.cpp)
 target_link_libraries(bvh_consistency PRIVATE pt_core pt_warnings)
 
@@ -47,6 +54,7 @@ set(GOLDEN_SCENES
     # scene took over a minute per render before, and now takes a fraction of a second.
     test_man_obj
     cornell_box
+    glossy_spheres
 )
 
 set(GOLDEN_SAMPLES 64)
