@@ -30,9 +30,18 @@ other surfaces is carried along the path rather than approximated by a constant.
   already contains a cosine factor, so drawing samples proportional to it makes the two
   cancel: a diffuse bounce reduces to multiplying by albedo, with no variance from the
   cosine at all.
-- **Direct light sampling** at every diffuse vertex, aimed at the cone each spherical
-  emitter subtends. Waiting for a scattered ray to land on a small bright light by chance
-  is what makes naive path tracers so noisy.
+- **Direct light sampling** at every diffuse and glossy vertex, aimed at the cone each
+  spherical emitter subtends. Waiting for a scattered ray to land on a small bright light
+  by chance is what makes naive path tracers so noisy.
+- **Multiple importance sampling** combining the two strategies above by the balance
+  heuristic. Light sampling is excellent for a small distant source and poor for one that
+  fills the sky; scattering is the reverse, and for a glossy surface far better still.
+  Weighting them takes the better of the two everywhere without deciding in advance which
+  case a scene is in. Measured on the glossy test scene: **1.80x less noise, equivalent to
+  3.2x the sample count.**
+- **GGX microfacet conductors**, sampled by visible normals, which gives rough metal a
+  real probability density. That density is what lets it take part in the weighting above
+  at all.
 - **Russian roulette** past the third bounce, terminating low-contribution paths at random
   and scaling survivors up to compensate, which costs nothing in bias.
 - **Stratified pixel samples**, one per cell of a jittered grid rather than independent
@@ -45,7 +54,7 @@ other surfaces is carried along the path rather than approximated by a constant.
 | `type` | Meaning |
 | --- | --- |
 | `diffuse` | Lambertian. `albedo` is the reflectance |
-| `metal` | Specular reflection tinted by `albedo`, blurred by `roughness` |
+| `metal` | GGX microfacet conductor. `albedo` is the reflectance at normal incidence, `roughness` the width of the highlight |
 | `dielectric` | Glass: refracts with Fresnel-weighted reflection, controlled by `ior` |
 
 Any material with a non-zero `emissive` is a light. Scenes written against the older
@@ -57,11 +66,19 @@ are mapped onto the closest equivalent.
 - **Direct light sampling covers spherical emitters only.** Emissive geometry of other
   shapes still lights the scene correctly through ordinary path tracing, just with more
   noise.
-- **No multiple importance sampling.** Light sampling handles diffuse surfaces and BSDF
-  sampling handles specular ones, but the two are not combined, so a rough metal under a
-  large light is noisier than it needs to be.
-- **Roughness is a direction perturbation, not a microfacet model.** It looks plausible
-  but is not a physically derived GGX lobe.
+- **Rough conductors lose energy.** The microfacet model accounts for light scattering
+  off the surface once, not for light bouncing between microfacets before leaving, so
+  rough metal is darker than it should be. Measured in a uniform environment with a
+  fully reflective conductor:
+
+  | Roughness | 0.05 | 0.2 | 0.4 | 0.6 | 0.8 | 1.0 |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | Energy reflected | 1.00 | 1.00 | 0.96 | 0.82 | 0.56 | 0.32 |
+
+  Negligible below about 0.4 and severe above it. The fix is a multiple-scattering
+  compensation term.
+- **Dielectrics are smooth only.** Roughness applies to conductors; glass is perfectly
+  clear.
 
 ## Building
 

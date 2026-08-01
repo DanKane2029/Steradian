@@ -48,7 +48,22 @@ class Integrator
      * light subtending a small solid angle is hit by chance only rarely, and each such
      * hit carries enormous weight.
      */
-    auto sampleDirectLighting(const Hit &hit, const Material &material, const Vec3 &albedo, Rng &rng) const -> Vec3;
+    auto sampleDirectLighting(const Hit &hit, const Material &material, const Vec3 &albedo, const Vec3 &viewDir,
+                              Rng &rng) const -> Vec3;
+
+    /**
+     * \brief Density that direct light sampling would have given a direction.
+     *
+     * Both estimators have to be able to evaluate each other's density, because the
+     * multiple importance sampling weight is the ratio between them. This answers "if
+     * light sampling had been asked to produce this exact direction, how likely was it?"
+     *
+     * \param from The shading point the direction was taken from.
+     * \param emitterIndex Which emitter the direction reached.
+     * \returns Probability density per unit solid angle, or zero if the emitter cannot
+     *          be sampled from that point.
+     */
+    auto lightPdf(const Vec3 &from, int emitterIndex) const -> float;
 
     /** radiance arriving from a direction that escapes the scene */
     auto background(const Vec3 &direction) const -> Vec3;
