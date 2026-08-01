@@ -220,6 +220,11 @@ Scene::Scene(std::string filePath)
             material.albedo = Vec3(materialData.at("diffuse").get<std::vector<float>>());
         }
 
+        if (materialData.contains("absorption"))
+        {
+            material.absorption = Vec3(materialData.at("absorption").get<std::vector<float>>());
+        }
+
         if (materialData.contains("emissive"))
         {
             material.emissive = Vec3(materialData.at("emissive").get<std::vector<float>>());

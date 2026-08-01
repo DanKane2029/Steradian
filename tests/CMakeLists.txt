@@ -68,6 +68,10 @@ set(GOLDEN_SCENES
     # reversed, which is what a lens does and what nothing else in the scene can fake, so
     # the reference image pins refraction down rather than merely exercising it.
     glass_lens
+    # Clear, tinted and deeply absorbing glass side by side. Absorption depends on the
+    # distance light travels inside the material, so each sphere is lighter at its rim
+    # than through its middle, which a surface tint cannot reproduce.
+    glass_tinted
     # The Stanford models. The dragon at 202,520 triangles is by a wide margin the
     # heaviest thing the acceleration structure is asked to organize, which is the point
     # of including it.

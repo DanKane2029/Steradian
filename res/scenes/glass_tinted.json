@@ -1,0 +1,19 @@
+{
+  "ambientLighting": [0.55, 0.6, 0.7],
+  "camera": { "org": [0, 0.9, 5.6], "lookAt": [0, 0.0, 0], "fov": 34 },
+  "materials": {
+    "floor":  { "type": "diffuse", "albedo": [0.62, 0.62, 0.64] },
+    "clear":  { "type": "dielectric", "albedo": [1,1,1], "ior": 1.5 },
+    "tint":   { "type": "dielectric", "albedo": [1,1,1], "ior": 1.5, "absorption": [1.8, 0.35, 0.55] },
+    "deep":   { "type": "dielectric", "albedo": [1,1,1], "ior": 1.5, "absorption": [5.0, 1.0, 1.6] },
+    "lamp":   { "type": "diffuse", "albedo": [0,0,0], "emissive": [110, 105, 96] }
+  },
+  "objects": [
+    { "type": "triangle", "material": "floor", "point0": [-9,-1,-9], "point1": [9,-1,-9], "point2": [9,-1,9] },
+    { "type": "triangle", "material": "floor", "point0": [-9,-1,-9], "point1": [9,-1,9],  "point2": [-9,-1,9] },
+    { "type": "sphere", "material": "clear", "center": [-1.7,-0.2,0], "radius": 0.75 },
+    { "type": "sphere", "material": "tint",  "center": [ 0.0,-0.2,0], "radius": 0.75 },
+    { "type": "sphere", "material": "deep",  "center": [ 1.7,-0.2,0], "radius": 0.75 },
+    { "type": "sphere", "material": "lamp",  "center": [2.6,4.4,3.0], "radius": 0.5 }
+  ]
+}
