@@ -4,6 +4,7 @@
 
 #include "RayTracer/Hit.h"
 #include "RayTracer/Ray.h"
+#include "Utils/Transform.h"
 #include "Utils/Vec3.h"
 
 /**
@@ -16,6 +17,15 @@ class SceneObject
     virtual Vec3 getNormal(Vec3 position) = 0;
     virtual Hit rayIntersect(Ray ray) = 0;
     virtual Vec3 getCenterPoint() = 0;
+
+    /**
+     * \brief Moves this primitive into place.
+     *
+     * Applied when the scene loads, so nothing downstream has to know the object was ever
+     * anywhere else. Implementations must recompute their bounds afterwards, since the
+     * acceleration structure is built from them.
+     */
+    virtual void applyTransform(const Transform &transform) = 0;
 
     void setMaterialIndex(uint32_t index)
     {
@@ -90,7 +100,12 @@ class Triangle : public SceneObject
     /** interpolates vertex texture coordinates from barycentric coordinates (u, v) */
     auto interpolateTextureCoord(float u, float v) const -> Vec3;
 
+    void applyTransform(const Transform &transform) override;
+
   private:
+    /** recomputes the axis aligned bounds from the current vertex positions */
+    void updateBounds();
+
     Vec3 point0;
     Vec3 point1;
     Vec3 point2;
@@ -119,6 +134,8 @@ class Sphere : public SceneObject
 
     /** maps a point on the sphere to spherical texture coordinates in [0, 1] */
     auto getTextureCoords(Vec3 pointOnSurface) const -> Vec3;
+
+    void applyTransform(const Transform &transform) override;
 
   private:
     Vec3 m_Center{};

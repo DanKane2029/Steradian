@@ -317,14 +317,27 @@ or system load, and it falls only if traversal is genuinely rejecting geometry.
   "objects": [
     { "type": "sphere",   "material": "gold",  "center": [0, 0, 0], "radius": 1 },
     { "type": "triangle", "material": "white", "point0": [0,0,0], "point1": [1,0,0], "point2": [0,1,0] },
-    { "type": "objModel", "material": "white", "path": "../models/ball.obj" }
+    { "type": "objModel", "material": "white", "path": "../models/ball.obj",
+      "translate": [0, -0.6, 0],                // all three are optional
+      "rotate":    [0, 45, 0],                  // degrees, applied about X then Y then Z
+      "scale":     0.5 }                        // one number, or [x, y, z]
   ]
 }
 ```
 
 Paths inside a scene are resolved relative to the scene file, so scenes and models can be
 moved or checked out anywhere. Triangles may carry optional `normal0/1/2` for smooth
-shading. `objModel` has no transform, so a mesh appears wherever its own coordinates put it.
+shading.
+
+Any object accepts `translate`, `rotate` and `scale`, applied in that order reading
+backwards: scaled first, then rotated, then moved, which is what makes a rotation turn an
+object in place rather than sweeping it around the origin. A model can therefore be placed
+where you want it rather than the camera having to be moved to wherever the model's own
+coordinates happen to be.
+
+Transforms are applied once when the scene loads, so they cost nothing per ray. A sphere
+takes only a uniform scale, since one radius cannot describe an ellipsoid; a non-uniform
+scale on one is reported and the largest factor used.
 
 The config file is separate because it describes the render rather than the scene:
 
@@ -368,6 +381,5 @@ and therefore continuous integration, possible.
   shapes still lights a scene correctly, through ordinary path tracing, but more noisily.
 - **Textures are not wired up.** Texture coordinates are loaded and interpolated and the
   sampling code exists, but no material reads from them yet.
-- **Meshes have no transform.** An `objModel` lands wherever its coordinates say.
 - **No adaptive sampling.** Every pixel gets the same number of samples, whether it
   converged long ago or is still noisy.

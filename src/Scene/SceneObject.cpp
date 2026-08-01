@@ -1,6 +1,7 @@
 #include "SceneObject.h"
 
 #include <cmath>
+#include <iostream>
 
 #include <cmath>
 
@@ -24,39 +25,13 @@
  */
 Triangle::Triangle(Vec3 p0, Vec3 p1, Vec3 p2) : point0(p0), point1(p1), point2(p2), hasNormalVertices(false)
 {
-    // calculates the smallest of 3 floats
-    auto smallest = [](float x, float y, float z) { return std::min(std::min(x, y), z); };
-
-    // calculates the largest of 3 floats
-    auto largest = [](float x, float y, float z) { return std::max(std::max(x, y), z); };
-
-    // calculate the min and max x, y, & z coordinates
-    minX = smallest(point0.x, point1.x, point2.x);
-    minY = smallest(point0.y, point1.y, point2.y);
-    minZ = smallest(point0.z, point1.z, point2.z);
-
-    maxX = largest(point0.x, point1.x, point2.x);
-    maxY = largest(point0.y, point1.y, point2.y);
-    maxZ = largest(point0.z, point1.z, point2.z);
+    updateBounds();
 }
 
 Triangle::Triangle(Vec3 p0, Vec3 n0, Vec3 p1, Vec3 n1, Vec3 p2, Vec3 n2)
     : point0(p0), normal0(n0), point1(p1), normal1(n1), point2(p2), normal2(n2), hasNormalVertices(true)
 {
-    // calculates the smallest of 3 floats
-    auto smallest = [](float x, float y, float z) { return std::min(std::min(x, y), z); };
-
-    // calculates the largest of 3 floats
-    auto largest = [](float x, float y, float z) { return std::max(std::max(x, y), z); };
-
-    // calculate the min and max x, y, & z coordinates
-    minX = smallest(point0.x, point1.x, point2.x);
-    minY = smallest(point0.y, point1.y, point2.y);
-    minZ = smallest(point0.z, point1.z, point2.z);
-
-    maxX = largest(point0.x, point1.x, point2.x);
-    maxY = largest(point0.y, point1.y, point2.y);
-    maxZ = largest(point0.z, point1.z, point2.z);
+    updateBounds();
 }
 
 /**
@@ -243,6 +218,47 @@ auto Triangle::rayIntersect(Ray ray) -> Hit
  *
  * \return - the center point as a Vec3
  */
+/**
+ * recomputes the axis aligned bounds from the current vertex positions
+ */
+void Triangle::updateBounds()
+{
+    const auto smallest = [](float x, float y, float z) { return std::min(std::min(x, y), z); };
+    const auto largest = [](float x, float y, float z) { return std::max(std::max(x, y), z); };
+
+    minX = smallest(point0.x, point1.x, point2.x);
+    minY = smallest(point0.y, point1.y, point2.y);
+    minZ = smallest(point0.z, point1.z, point2.z);
+
+    maxX = largest(point0.x, point1.x, point2.x);
+    maxY = largest(point0.y, point1.y, point2.y);
+    maxZ = largest(point0.z, point1.z, point2.z);
+}
+
+/**
+ * moves the triangle's vertices, and reorients its normals, into world space
+ */
+void Triangle::applyTransform(const Transform &transform)
+{
+    if (transform.isIdentity())
+    {
+        return;
+    }
+
+    point0 = transform.transformPoint(point0);
+    point1 = transform.transformPoint(point1);
+    point2 = transform.transformPoint(point2);
+
+    if (hasNormalVertices)
+    {
+        normal0 = transform.transformNormal(normal0);
+        normal1 = transform.transformNormal(normal1);
+        normal2 = transform.transformNormal(normal2);
+    }
+
+    updateBounds();
+}
+
 auto Triangle::getCenterPoint() -> Vec3
 {
     return (point0 + point1 + point2) / 3.0f;
@@ -371,6 +387,39 @@ auto Sphere::getTextureCoords(Vec3 pointOnSurface) const -> Vec3
  *
  * \return - the sphere's center point as a Vec3
  */
+/**
+ * moves the sphere's centre, and scales its radius
+ *
+ * A sphere has one radius, so it cannot represent a non-uniform scale: squashing one
+ * would produce an ellipsoid, which this primitive is not. The largest of the three
+ * factors is used and the mismatch reported, rather than silently rendering something
+ * other than what the scene asked for.
+ */
+void Sphere::applyTransform(const Transform &transform)
+{
+    if (transform.isIdentity())
+    {
+        return;
+    }
+
+    if (transform.hasNonUniformScale())
+    {
+        std::cerr << "Sphere cannot be scaled non-uniformly; using the largest factor (" << transform.uniformScale()
+                  << ")" << std::endl;
+    }
+
+    m_Center = transform.transformPoint(m_Center);
+    m_Radius *= transform.uniformScale();
+
+    minX = m_Center.x - m_Radius;
+    minY = m_Center.y - m_Radius;
+    minZ = m_Center.z - m_Radius;
+
+    maxX = m_Center.x + m_Radius;
+    maxY = m_Center.y + m_Radius;
+    maxZ = m_Center.z + m_Radius;
+}
+
 auto Sphere::getCenterPoint() -> Vec3
 {
     return m_Center;

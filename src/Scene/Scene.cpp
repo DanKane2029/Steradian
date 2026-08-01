@@ -53,6 +53,39 @@ auto resolveAssetPath(const std::string &assetPath, const std::filesystem::path 
     return path.string();
 }
 
+/**
+ * reads an object's placement from a scene file
+ *
+ * All three parts are optional, and they are applied in the order scale, rotate,
+ * translate, which is what makes a rotation turn an object in place rather than sweeping
+ * it around the origin.
+ */
+auto parseTransform(const json &object) -> Transform
+{
+    Transform transform;
+
+    if (object.contains("translate"))
+    {
+        transform.translation = Vec3(object.at("translate").get<std::vector<float>>());
+    }
+
+    if (object.contains("rotate"))
+    {
+        transform.rotationDegrees = Vec3(object.at("rotate").get<std::vector<float>>());
+    }
+
+    if (object.contains("scale"))
+    {
+        const json &scale = object.at("scale");
+
+        // A single number is the common case and reads better than repeating it three
+        // times, so both forms are accepted.
+        transform.scale = scale.is_number() ? Vec3(scale.get<float>()) : Vec3(scale.get<std::vector<float>>());
+    }
+
+    return transform;
+}
+
 } // namespace
 
 /**
@@ -244,11 +277,19 @@ Scene::Scene(std::string filePath)
     {
         std::string type = object.at("type");
         const uint32_t materialId = materialIndexByName(object.at("material"));
+        const Transform transform = parseTransform(object);
         if (type == "objModel")
         {
             std::string path = resolveAssetPath(object.at("path"), sceneDir);
             ObjModel objModel(path);
-            addObjects(objModel.getSceneObjects(), materialId);
+
+            std::vector<std::shared_ptr<SceneObject>> triangles = objModel.getSceneObjects();
+            for (const std::shared_ptr<SceneObject> &triangle : triangles)
+            {
+                triangle->applyTransform(transform);
+            }
+
+            addObjects(triangles, materialId);
         }
         else if (type == "triangle")
         {
@@ -262,11 +303,15 @@ Scene::Scene(std::string filePath)
                 Vec3 normal1(object.at("normal1").get<std::vector<float>>());
                 Vec3 normal2(object.at("normal2").get<std::vector<float>>());
 
-                addObject(std::make_shared<Triangle>(point0, normal0, point1, normal1, point2, normal2), materialId);
+                auto triangle = std::make_shared<Triangle>(point0, normal0, point1, normal1, point2, normal2);
+                triangle->applyTransform(transform);
+                addObject(triangle, materialId);
             }
             else
             {
-                addObject(std::make_shared<Triangle>(point0, point1, point2), materialId);
+                auto triangle = std::make_shared<Triangle>(point0, point1, point2);
+                triangle->applyTransform(transform);
+                addObject(triangle, materialId);
             }
         }
         else if (type == "sphere")
@@ -275,6 +320,12 @@ Scene::Scene(std::string filePath)
             float radius = object.at("radius");
 
             auto sphere = std::make_shared<Sphere>(center, radius);
+            sphere->applyTransform(transform);
+
+            // The emitter is registered from the sphere's final position, so a
+            // transformed light is sampled where it actually ends up.
+            center = sphere->getCenterPoint();
+            radius *= transform.uniformScale();
 
             // An emissive sphere is an area light. Registering it lets direct lighting
             // sample it, which is what keeps small bright sources from being extremely
