@@ -39,6 +39,21 @@ class Integrator
      */
     auto radiance(Ray ray, Rng &rng) const -> Vec3;
 
+    /**
+     * \brief Estimates radiance, and reports what the ray first struck.
+     *
+     * The surface colour and normal at the first hit are what a denoiser needs as a
+     * guide. They are essentially free to produce and, unlike the lighting, they are
+     * nearly noise-free: a single sample gets them almost exactly right, because they
+     * depend only on which surface is visible and not on where light came from.
+     *
+     * \param ray The camera ray.
+     * \param rng Per-thread generator.
+     * \param outAlbedo Set to the base colour of the first surface hit.
+     * \param outNormal Set to the normal of the first surface hit, or zero on a miss.
+     */
+    auto radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) const -> Vec3;
+
   private:
     /**
      * \brief Estimates direct lighting at a surface point by sampling the emitters.

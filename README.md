@@ -149,6 +149,7 @@ cmake -B build -DPT_BUILD_VIEWER=OFF
 | `--samples <n>` | Samples per pixel for a headless render (default 16) |
 | `--seed <n>` | Base seed (default 1) |
 | `--threads <n>` | Worker threads (default: `numThreads` from the config) |
+| `--denoise [n]` | Filter noise from the saved image using surface colour and normals as a guide (default 5 passes) |
 | `--headless` | Render once and exit without opening a window |
 
 A headless render is **deterministic**: the same `--seed` and `--samples` produce a
@@ -193,6 +194,55 @@ is on screen matches what `--out` produces.
 Lights use inverse-square falloff, so `intensity` scales with the square of the distance
 to the subject: a light 10 units away needs roughly 100× the intensity of one 1 unit away
 to look equally bright.
+
+### Denoising
+
+A path traced image is noisy because each pixel averages a limited number of random light
+paths. The noise is entirely in the *lighting*: which surface is visible at a pixel, and
+which way it faces, are known almost exactly from a single sample.
+
+`--denoise` exploits that. The renderer also produces an albedo and a normal buffer, which
+are nearly noise-free, and the filter then blurs the lighting hard while refusing to cross
+edges those guides reveal. Two pixels on the same flat wall are averaged freely; two
+spanning a wall-to-floor boundary are not.
+
+```sh
+steradian --config res/configs/test_config.json \
+          --scene res/scenes/cornell_box.json \
+          --out render.png --samples 64 --denoise
+```
+
+Five passes over a 400x400 image take about 0.4 s.
+
+**Measured**, against a 4000-sample reference at 32 samples per pixel:
+
+| Strength | RMS error | vs. not denoising |
+| --- | --- | --- |
+| off | 12.44 | — |
+| 0.06 | 11.21 | 1.11x closer |
+| **0.10** (default) | **10.78** | **1.15x closer** |
+| 0.15 | 11.74 | 1.06x closer |
+| 0.30 | 17.05 | 0.73x, *further away* |
+
+Two things that table is saying. First, there is an optimum: past it the filter removes
+more real shading than noise and the image gets measurably worse, however smooth it looks.
+Second, even at the optimum the numerical gain is modest, roughly equivalent to 1.3x the
+samples, while the *visible* improvement is far larger than that. Noise is much more
+objectionable to the eye than a slight loss of detail, which is exactly the trade being
+made, and it is why denoising is judged by eye in practice rather than by error metrics.
+
+It is an approximation, and worth knowing where it costs you:
+
+- **Reflections blur.** The guides describe the surface itself, not what it reflects, so
+  the filter cannot tell that detail in a mirror has its own structure. Production
+  denoisers keep a separate specular buffer; this one does not.
+- **Fine lighting detail softens** -- small caustics, tight contact shadows.
+- **Nothing verifies it.** Every other part of the renderer can be checked against a
+  ground truth; changing the image is this feature's entire purpose, so the furnace test
+  has nothing to say about it.
+
+Best used on an image that is already reasonably converged, rather than as a substitute
+for sampling.
 
 ### Statistics
 

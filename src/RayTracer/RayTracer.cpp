@@ -43,14 +43,14 @@ auto RayTracer::makeCameraRay(float u, float v) -> Ray
     return {camera.org, dir};
 }
 
-auto RayTracer::samplePixel(int ix, int iy, float jitterX, float jitterY, Rng &rng) -> Vec3
+auto RayTracer::samplePixel(int ix, int iy, float jitterX, float jitterY, Rng &rng, Vec3 &albedo, Vec3 &normal) -> Vec3
 {
     auto size = m_PixelBuffer->getSize();
 
     const float u = (static_cast<float>(ix) + jitterX) / static_cast<float>(size.first);
     const float v = (static_cast<float>(iy) + jitterY) / static_cast<float>(size.second);
 
-    return m_Integrator->radiance(makeCameraRay(u, v), rng);
+    return m_Integrator->radiance(makeCameraRay(u, v), rng, albedo, normal);
 }
 
 void RayTracer::sampleScene(float x, float y)
@@ -64,10 +64,12 @@ void RayTracer::sampleScene(float x, float y)
     // thread needs its own generator rather than a shared one.
     static thread_local Rng rng(0x9e3779b97f4a7c15ULL, reinterpret_cast<uintptr_t>(&rng));
 
-    const Vec3 color = samplePixel(ix, iy, rng.nextFloat(), rng.nextFloat(), rng);
+    Vec3 albedo;
+    Vec3 normal;
+    const Vec3 color = samplePixel(ix, iy, rng.nextFloat(), rng.nextFloat(), rng, albedo, normal);
 
     m_PixelBufferGuard.lock();
-    m_PixelBuffer->setPixel(ix, iy, color);
+    m_PixelBuffer->setSample(ix, iy, color, albedo, normal);
     m_PixelBufferGuard.unlock();
 }
 
@@ -119,7 +121,11 @@ void RayTracer::renderRows(int yStart, int yEnd, unsigned int samplesPerPixel, u
                     jitterY = rng.nextFloat();
                 }
 
-                m_PixelBuffer->setPixel(ix, iy, samplePixel(ix, iy, jitterX, jitterY, rng));
+                Vec3 albedo;
+                Vec3 normal;
+                const Vec3 color = samplePixel(ix, iy, jitterX, jitterY, rng, albedo, normal);
+
+                m_PixelBuffer->setSample(ix, iy, color, albedo, normal);
             }
         }
     }

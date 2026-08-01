@@ -83,7 +83,7 @@ class RayTracer
      * \param rng The generator to use for stochastic effects such as soft shadows.
      * \returns The linear color of the sample.
      */
-    auto samplePixel(int ix, int iy, float jitterX, float jitterY, Rng &rng) -> Vec3;
+    auto samplePixel(int ix, int iy, float jitterX, float jitterY, Rng &rng, Vec3 &albedo, Vec3 &normal) -> Vec3;
 
     /**
      * \brief Builds the primary camera ray through a point on the film plane.

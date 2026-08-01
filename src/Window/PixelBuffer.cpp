@@ -10,6 +10,7 @@
  */
 PixelBuffer::PixelBuffer(int width, int height)
     : m_Width(width), m_Height(height), m_Buffer(new float[numColorComponents()]()),
+      m_AlbedoBuffer(new float[numColorComponents()]()), m_NormalBuffer(new float[numColorComponents()]()),
       m_MetaDataBuffer(new PixelMetaData[numPixels()])
 {
 }
@@ -20,6 +21,8 @@ PixelBuffer::PixelBuffer(int width, int height)
 PixelBuffer::~PixelBuffer()
 {
     delete[] m_Buffer;
+    delete[] m_AlbedoBuffer;
+    delete[] m_NormalBuffer;
     delete[] m_MetaDataBuffer;
 }
 
@@ -66,6 +69,36 @@ void PixelBuffer::setPixel(int x, int y, Vec3 color)
  *
  * \return - the pointer to the first float value of the buffer
  */
+void PixelBuffer::setSample(int x, int y, Vec3 color, Vec3 albedo, Vec3 normal)
+{
+    if (x < 0 || y < 0 || static_cast<unsigned int>(x) >= m_Width || static_cast<unsigned int>(y) >= m_Height)
+    {
+        return;
+    }
+
+    const unsigned int metaDataIndex = (static_cast<unsigned int>(y) * m_Width) + static_cast<unsigned int>(x);
+    const unsigned int index = metaDataIndex * 3;
+
+    const unsigned int numRaysShot = m_MetaDataBuffer[metaDataIndex].numRaysShot;
+
+    const float oldProportion = static_cast<float>(numRaysShot) / static_cast<float>(numRaysShot + 1);
+    const float newProportion = 1.0f / static_cast<float>(numRaysShot + 1);
+
+    // The guide channels are averaged exactly like the colour, so they stay consistent
+    // with it and settle immediately: they barely vary between samples.
+    const auto accumulate = [&](float *buffer, const Vec3 &value) {
+        buffer[index] = (buffer[index] * oldProportion) + (value.x * newProportion);
+        buffer[index + 1] = (buffer[index + 1] * oldProportion) + (value.y * newProportion);
+        buffer[index + 2] = (buffer[index + 2] * oldProportion) + (value.z * newProportion);
+    };
+
+    accumulate(m_Buffer, color);
+    accumulate(m_AlbedoBuffer, albedo);
+    accumulate(m_NormalBuffer, normal);
+
+    m_MetaDataBuffer[metaDataIndex].numRaysShot = numRaysShot + 1;
+}
+
 auto PixelBuffer::getPixels() -> float *
 {
     return m_Buffer;
@@ -87,6 +120,12 @@ void PixelBuffer::resizeBuffer(int width, int height)
     delete[] m_Buffer;
     m_Buffer = new float[numColorComponents()]();
 
+    delete[] m_AlbedoBuffer;
+    m_AlbedoBuffer = new float[numColorComponents()]();
+
+    delete[] m_NormalBuffer;
+    m_NormalBuffer = new float[numColorComponents()]();
+
     delete[] m_MetaDataBuffer;
     m_MetaDataBuffer = new PixelMetaData[numPixels()];
 }
@@ -97,6 +136,8 @@ void PixelBuffer::resizeBuffer(int width, int height)
 void PixelBuffer::clearBuffer()
 {
     std::fill(m_Buffer, m_Buffer + numColorComponents(), 0.0f);
+    std::fill(m_AlbedoBuffer, m_AlbedoBuffer + numColorComponents(), 0.0f);
+    std::fill(m_NormalBuffer, m_NormalBuffer + numColorComponents(), 0.0f);
     std::fill(m_MetaDataBuffer, m_MetaDataBuffer + numPixels(), PixelMetaData{});
 }
 

@@ -204,6 +204,18 @@ auto Integrator::sampleDirectLighting(const Hit &hit, const Material &material, 
 
 auto Integrator::radiance(Ray ray, Rng &rng) const -> Vec3
 {
+    Vec3 albedo;
+    Vec3 normal;
+    return radiance(ray, rng, albedo, normal);
+}
+
+auto Integrator::radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) const -> Vec3
+{
+    // Defaults describe a ray that leaves without hitting anything.
+    outAlbedo = background(ray.dir);
+    outNormal = Vec3();
+    bool recordedFirstHit = false;
+
     Vec3 radiance{};
     Vec3 throughput{1.0f, 1.0f, 1.0f};
 
@@ -232,6 +244,15 @@ auto Integrator::radiance(Ray ray, Rng &rng) const -> Vec3
 
         const Material &material = m_Scene->getMaterialByIndex(hit.materialIndex);
         const Vec3 albedo = material.albedoAt(hit.textureCoord);
+
+        if (!recordedFirstHit)
+        {
+            // An emitter has no meaningful reflectance, so its emission stands in as the
+            // colour a denoiser should preserve.
+            outAlbedo = material.isEmissive() ? material.emissive : albedo;
+            outNormal = hit.normal;
+            recordedFirstHit = true;
+        }
 
         if (material.isEmissive())
         {

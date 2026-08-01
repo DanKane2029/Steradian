@@ -13,6 +13,7 @@ add_library(pt_core STATIC
     Scene/SceneObject.cpp
     Scene/Texture.cpp
     Utils/Config.cpp
+    Utils/Denoiser.cpp
     Utils/ImageIO.cpp
     Utils/ObjModel.cpp
     Utils/Stats.cpp

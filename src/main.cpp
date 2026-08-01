@@ -1,6 +1,7 @@
 #include "RayTracer/RayTracer.h"
 #include "Scene/Scene.h"
 #include "Utils/Config.h"
+#include "Utils/Denoiser.h"
 #include "Utils/ImageIO.h"
 #include "Utils/Random.h"
 #include "Utils/Stats.h"
@@ -36,6 +37,8 @@ struct Options
     unsigned int samplesPerPixel = 16;
     uint64_t seed = 1;
     unsigned int numThreads = 0; // 0 means "use the value from the config file"
+    int denoiseIterations = 0;   // 0 disables denoising
+    float denoiseStrength = 0.10f;
 
     bool headless = false;
     bool showHelp = false;
@@ -53,6 +56,13 @@ void printUsage(const char *program)
               << "  --seed <n>         Base seed; the same seed and sample count reproduce\n"
               << "                     the same image regardless of thread count (default 1)\n"
               << "  --threads <n>      Worker threads (default: numThreads from the config)\n"
+              << "  --denoise [n]      Filter noise out of the saved image using the\n"
+              << "                     surface colour and normals as a guide (default 5\n"
+              << "                     passes). Approximates: fine lighting detail such as\n"
+              << "                     small caustics is softened\n"
+              << "  --denoise-strength <v>  How much radiance difference the filter blurs\n"
+              << "                     across (default 0.10). Larger removes more noise and\n"
+              << "                     more real shading with it\n"
               << "  --headless         Render once and exit without opening a window.\n"
               << "                     Combine with --out to save the result\n"
               << "  --help             Show this message\n"
@@ -128,6 +138,20 @@ auto parseArgs(int argc, char *argv[]) -> Options
         else if (arg == "--seed")
         {
             options.seed = std::stoull(takeValue(argc, argv, i, "--seed"));
+        }
+        else if (arg == "--denoise")
+        {
+            // The iteration count is optional, so only consume the next argument when it
+            // actually looks like a number rather than the next flag.
+            options.denoiseIterations = 5;
+            if (i + 1 < argc && argv[i + 1][0] != '-')
+            {
+                options.denoiseIterations = std::stoi(takeValue(argc, argv, i, "--denoise"));
+            }
+        }
+        else if (arg == "--denoise-strength")
+        {
+            options.denoiseStrength = std::stof(takeValue(argc, argv, i, "--denoise-strength"));
         }
         else if (arg == "--threads")
         {
@@ -281,10 +305,29 @@ auto main(int argc, char *argv[]) -> int
                           << std::endl;
             }
 
+            const float *imageToWrite = pixelBuffer.getPixels();
+            std::vector<float> denoised;
+
+            if (options.denoiseIterations > 0)
+            {
+                Denoiser::Settings settings;
+                settings.iterations = options.denoiseIterations;
+                settings.colorSigma = options.denoiseStrength;
+
+                const auto denoiseStart = std::chrono::steady_clock::now();
+                denoised = Denoiser::denoise(config.windowWidth, config.windowHeight, pixelBuffer.getPixels(),
+                                             pixelBuffer.getAlbedo(), pixelBuffer.getNormals(), settings);
+                const auto denoiseEnd = std::chrono::steady_clock::now();
+
+                imageToWrite = denoised.data();
+
+                std::cout << "Denoised in " << std::chrono::duration<double>(denoiseEnd - denoiseStart).count()
+                          << " s (" << settings.iterations << " passes)" << std::endl;
+            }
+
             if (!options.outputPath.empty())
             {
-                if (!ImageIO::writePNG(options.outputPath, config.windowWidth, config.windowHeight,
-                                       pixelBuffer.getPixels()))
+                if (!ImageIO::writePNG(options.outputPath, config.windowWidth, config.windowHeight, imageToWrite))
                 {
                     std::cerr << "Error: failed to write " << options.outputPath << std::endl;
                     return EXIT_FAILURE;
