@@ -36,8 +36,8 @@ struct Options
 
     unsigned int samplesPerPixel = 16;
     uint64_t seed = 1;
-    unsigned int numThreads = 0; // 0 means "use the value from the config file"
-    int denoiseIterations = 0;   // 0 disables denoising
+    unsigned int numThreads = 0;    // 0 means "use the value from the config file"
+    int denoiseIterations = 0;      // 0 disables denoising
     float adaptiveTolerance = 0.0f; // 0 samples every pixel the full number of times
     float denoiseStrength = 0.10f;
 

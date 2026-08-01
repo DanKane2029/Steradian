@@ -1,10 +1,10 @@
 #pragma once
+#include <algorithm>
 #include <atomic>
 #include <cstdint>
-#include <algorithm>
 #include <memory>
-#include <utility>
 #include <mutex>
+#include <utility>
 
 #include "Camera.h"
 #include "Hit.h"
