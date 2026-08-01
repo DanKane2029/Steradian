@@ -14,6 +14,15 @@ target_link_libraries(transform_test PRIVATE pt_core pt_warnings)
 add_test(NAME transform COMMAND transform_test)
 set_tests_properties(transform PROPERTIES TIMEOUT 60)
 
+# The procedural checker, and specifically its behaviour on a plane that lies exactly on a
+# cell boundary. That is where scenes put their floors, and getting it wrong speckles the
+# floor instead of failing outright, so it needs asserting rather than looking at.
+add_executable(checker_test checker_test.cpp)
+target_link_libraries(checker_test PRIVATE pt_core pt_warnings)
+
+add_test(NAME checker COMMAND checker_test)
+set_tests_properties(checker PROPERTIES TIMEOUT 60)
+
 add_executable(image_compare image_compare.cpp)
 target_link_libraries(image_compare PRIVATE pt_core pt_warnings)
 
@@ -77,6 +86,18 @@ set(GOLDEN_SCENES
     # of including it.
     bunny
     dragon
+    # The dragon again, in glass, over a checkered floor. This is the only scene where a
+    # procedural material and a refracting mesh meet, which is the combination worth
+    # guarding: the checker is evaluated at whatever position a path arrives at, so it
+    # covers the floor, the floor seen through the glass, and the floor seen in its
+    # reflections, all from one pattern with a shape that is obvious when it goes wrong.
+    #
+    # Note this renders darker than the same scene does normally. The shared test config
+    # caps paths at three bounces to keep the suite quick, and glass spends bounces faster
+    # than anything else, so most paths through the body are cut off before reaching a
+    # light. That costs the reference nothing as a regression test, but it is not what the
+    # scene is supposed to look like -- see docs/glass_dragon.png for that.
+    glass_dragon
 )
 
 set(GOLDEN_SAMPLES 64)

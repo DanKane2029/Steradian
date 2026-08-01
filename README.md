@@ -150,6 +150,7 @@ movement speed.
 | `test_man_obj` | A 48,918 triangle mesh |
 | `bunny` | The Stanford Bunny, 69,451 triangles |
 | `dragon` | The Stanford Dragon, 202,520 triangles |
+| `glass_dragon` | The same dragon in tinted glass, over a checkered floor |
 
 ### Testing
 
@@ -257,6 +258,9 @@ stop anywhere is.
 | `metal` | GGX microfacet conductor. `albedo` tints the reflection, `roughness` sets the width of the highlight |
 | `dielectric` | Glass. Refracts with Fresnel-weighted reflection and total internal reflection, controlled by `ior` (1.5 is typical glass), and absorbs along the path through its interior via `absorption` |
 
+Any material can carry a `checker` instead of a flat colour, which alternates its `albedo`
+with a second one over squares of a given size.
+
 Any material with a non-zero `emissive` is a light. There are no light objects as such:
 lights are simply geometry that emits, and the older `lights` array in a scene file is
 converted into emissive spheres when it loads.
@@ -317,6 +321,38 @@ A surface tint cannot do this, having no notion of how far anything travelled. S
 `absorption` per channel; the channel that survives is the colour you see, so absorbing
 red leaves the blue green cast of thick window glass.
 
+### Checkered surfaces
+
+![A glass dragon over a checkered floor](docs/glass_dragon.png)
+
+A checker is the traditional thing to put under a glass object, and for a reason worth
+stating: it is a pattern whose correct appearance is known in advance. Straight lines stay
+straight, squares stay square, and the whole thing runs to a vanishing point. Anything that
+refracts, reflects or magnifies it is measured against that, so errors that a photograph of
+a real object would hide have nowhere to go. In the image above the floor seen through the
+dragon's body is inverted and bent, but it is still made of squares.
+
+Set `checker` on any material with a second colour and a square size:
+
+```jsonc
+"floor": { "type": "diffuse", "albedo": [0.81, 0.79, 0.75],
+           "checker": { "albedo": [0.07, 0.08, 0.1], "scale": 0.5 } }
+```
+
+The pattern is keyed on where a point is in the world rather than on texture coordinates.
+Large flat surfaces are usually written straight into a scene as a pair of triangles, and
+those carry no useful texture coordinates at all, so a checker that needed them would not
+work on the surfaces that most want one.
+
+That choice has one sharp edge, which is worth knowing about because the symptom does not
+look like its cause. Every cell boundary is a discontinuity, so a surface lying exactly on
+one has no well defined colour: whether a hit lands a hair above or below the plane decides
+which square it belongs to, and intersection results carry exactly that much error. A floor
+on `y = 0` with a square size that divides evenly hits this every time, and comes out
+speckled rather than checkered. The grid is therefore offset by half a square, which puts
+those surfaces in the middle of a cell instead of on its edge. `tests/checker_test.cpp`
+asserts it, and fails on all three of its plane cases without the offset.
+
 ### Colour
 
 Radiance is accumulated in linear space and left unbounded: a light source really is
@@ -360,15 +396,22 @@ legitimately alter every pixel.
 
 ## How it is tested
 
-Eighteen tests, running in about seventeen seconds.
+Twenty-one tests, running in about fifty seconds.
 
-**Reference images.** Nine scenes rendered at a fixed seed and sample count, compared
+**Reference images.** Twelve scenes rendered at a fixed seed and sample count, compared
 against committed references. Tolerances are tight, and were chosen by measuring what a
 deliberately introduced 2% brightness error actually looks like rather than by picking a
 number that felt safe.
 
 **Determinism.** The same scene at one, three and eight threads must produce identical
-bytes.
+bytes, with adaptive sampling both off and on. Adaptive is where that property is easiest
+to lose, since how many samples a pixel takes is decided while rendering.
+
+**Procedural checker.** A plane lying exactly on a cell boundary must have one colour per
+point. That is the arrangement every scene here uses, a floor on `y = 0`, and getting it
+wrong speckles the floor rather than failing outright. The test sweeps across the plane and
+compares each point against the same point nudged either side of it; all three of its plane
+cases fail if the half-square offset that guards this is removed.
 
 **Acceleration structure agreement.** For thousands of random rays per scene, the
 hierarchy must return exactly what a brute force scan over every primitive returns. Image
@@ -409,6 +452,8 @@ or system load, and it falls only if traversal is genuinely rejecting geometry.
   },
   "materials": {
     "white": { "type": "diffuse", "albedo": [0.73, 0.73, 0.73] },
+    "floor": { "type": "diffuse", "albedo": [0.81, 0.79, 0.75],
+               "checker": { "albedo": [0.07, 0.08, 0.1], "scale": 0.5 } },
     "gold":  { "type": "metal", "albedo": [0.95, 0.78, 0.42], "roughness": 0.2 },
     "glass": { "type": "dielectric", "albedo": [1, 1, 1], "ior": 1.5 },
     "lamp":  { "type": "diffuse", "albedo": [0, 0, 0], "emissive": [26, 22, 18] }

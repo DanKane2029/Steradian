@@ -1,4 +1,5 @@
 #pragma once
+#include <cmath>
 #include <string>
 #include <utility>
 
@@ -60,6 +61,26 @@ struct Material
     /** optional albedo texture, sampled with the surface's texture coordinates */
     Texture texture;
 
+    /**
+     * \brief The second colour of a procedural checker, and the size of one square.
+     *
+     * Keyed on where a point is in the world rather than on texture coordinates, because
+     * the surfaces that most want a checker are the large flat ones written directly into
+     * a scene as a pair of triangles, and those carry no useful texture coordinates at all.
+     * A world-space checker also stays the same size across a floor no matter how the
+     * geometry underneath it happens to be divided up.
+     *
+     * A scale of zero means no checker, and the plain albedo is used.
+     */
+    Vec3 checkerAlbedo{};
+    float checkerScale = 0.0f;
+
+    /** true when this material paints a checker rather than a flat colour */
+    auto hasChecker() const -> bool
+    {
+        return checkerScale > 0.0f;
+    }
+
     Material() = default;
 
     explicit Material(std::string name) : name(std::move(name))
@@ -73,17 +94,40 @@ struct Material
     }
 
     /**
-     * \brief The albedo at a point, taking any texture into account.
+     * \brief The albedo at a point, taking any checker or texture into account.
      *
      * \param texCoord Surface texture coordinates; only x and y are used.
+     * \param position Where the point is in the world, for the procedural checker.
      */
-    auto albedoAt(const Vec3 &texCoord) const -> Vec3
+    auto albedoAt(const Vec3 &texCoord, const Vec3 &position) const -> Vec3
     {
+        const Vec3 base = hasChecker() ? checkerAt(position) : albedo;
+
         if (!texture.isValid())
         {
-            return albedo;
+            return base;
         }
 
-        return albedo * texture.getTexel(texCoord.x, texCoord.y);
+        return base * texture.getTexel(texCoord.x, texCoord.y);
+    }
+
+  private:
+    /** \brief Which of the two checker colours covers a point. */
+    auto checkerAt(const Vec3 &position) const -> Vec3
+    {
+        const float inverseScale = 1.0f / checkerScale;
+
+        // The half-square offset matters more than it looks. Without it the cell boundaries
+        // sit at whole multiples of the square size, which is exactly where scenes tend to
+        // put their floors: a floor lying on y = 0 would have every hit land on a boundary,
+        // and whether floor() rounded to one side or the other would come down to whether
+        // the intersection returned +0 or a value a hair below it. That decides the colour,
+        // so the floor would come out speckled rather than checkered. Offsetting by half a
+        // square puts the common cases in the middle of a cell instead of on its edge.
+        const auto cell = [inverseScale](float v) { return static_cast<int>(std::floor((v * inverseScale) + 0.5f)); };
+
+        const int parity = (cell(position.x) + cell(position.y) + cell(position.z)) & 1;
+
+        return parity == 0 ? albedo : checkerAlbedo;
     }
 };
