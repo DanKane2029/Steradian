@@ -64,6 +64,10 @@ set(GOLDEN_SCENES
     test_man_obj
     cornell_box
     glossy_spheres
+    # A glass sphere in front of red, green and blue spheres. Through it the order is
+    # reversed, which is what a lens does and what nothing else in the scene can fake, so
+    # the reference image pins refraction down rather than merely exercising it.
+    glass_lens
 )
 
 set(GOLDEN_SAMPLES 64)

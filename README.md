@@ -120,6 +120,7 @@ movement speed.
 | --- | --- |
 | `cornell_box` | Global illumination: colour bleeding, soft shadows, a mirror |
 | `glossy_spheres` | Conductors at three roughnesses |
+| `glass_lens` | Refraction: a glass sphere inverts the scene behind it |
 | `two_spheres` | A diffuse and a metal sphere under a sky |
 | `single_sphere`, `single_triangle` | Minimal scenes |
 | `test_obj_ball` | A 960 triangle mesh |
@@ -192,7 +193,7 @@ uncovered.
 | --- | --- |
 | `diffuse` | Lambertian. `albedo` is the fraction of light reflected |
 | `metal` | GGX microfacet conductor. `albedo` tints the reflection, `roughness` sets the width of the highlight |
-| `dielectric` | Glass. Refracts with Fresnel-weighted reflection, controlled by `ior` |
+| `dielectric` | Glass. Refracts with Fresnel-weighted reflection and total internal reflection, controlled by `ior` (1.5 is typical glass) |
 
 Any material with a non-zero `emissive` is a light. There are no light objects as such:
 lights are simply geometry that emits, and the older `lights` array in a scene file is
@@ -376,7 +377,10 @@ and therefore continuous integration, possible.
   roughness and severe above it: a fully reflective conductor returns 96% of the light at
   0.4 roughness and 32% at 1.0. The fix is a multiple-scattering compensation term.
 - **Dielectrics are smooth only.** Roughness applies to conductors; glass is perfectly
-  clear.
+  clear, so frosted or etched surfaces are not available.
+- **Glass does not absorb.** A thick piece is exactly as clear as a thin one, since there
+  is no attenuation with distance travelled through the material. `albedo` tints every
+  interaction with the surface rather than the path through the interior.
 - **Direct light sampling covers spherical emitters only.** Emissive geometry of other
   shapes still lights a scene correctly, through ordinary path tracing, but more noisily.
 - **Textures are not wired up.** Texture coordinates are loaded and interpolated and the
