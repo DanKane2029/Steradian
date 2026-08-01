@@ -274,6 +274,17 @@ Scene::Scene(std::string filePath)
             material.texture = Texture(resolveAssetPath(materialData.at("texture"), sceneDir));
         }
 
+        if (materialData.contains("checker"))
+        {
+            const json &checker = materialData.at("checker");
+
+            // The material's own albedo is the first colour, so only the second needs
+            // naming here. A default square size keeps the common case to one word.
+            material.checkerAlbedo = checker.contains("albedo") ? Vec3(checker.at("albedo").get<std::vector<float>>())
+                                                                : Vec3(0.05f, 0.05f, 0.05f);
+            material.checkerScale = optionalFloat(checker, "scale", 1.0f);
+        }
+
         registerMaterial(material);
     }
 
