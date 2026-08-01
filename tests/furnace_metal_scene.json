@@ -1,11 +1,44 @@
 {
-  "ambientLighting": [1.0, 1.0, 1.0],
-  "camera": { "org": [0, 0, 3.0], "lookAt": [0, 0, 0], "fov": 45 },
+  "ambientLighting": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "camera": {
+    "org": [
+      0,
+      0,
+      3.0
+    ],
+    "lookAt": [
+      0,
+      0,
+      0
+    ],
+    "fov": 45
+  },
   "materials": {
-    "mirror": { "type": "metal", "albedo": [1.0, 1.0, 1.0], "roughness": 0.15 }
+    "mirror": {
+      "type": "metal",
+      "albedo": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "roughness": 0.8
+    }
   },
   "objects": [
-    { "type": "sphere", "material": "mirror", "center": [0, 0, 0], "radius": 1.0 }
+    {
+      "type": "sphere",
+      "material": "mirror",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 1.0
+    }
   ],
   "lights": []
 }

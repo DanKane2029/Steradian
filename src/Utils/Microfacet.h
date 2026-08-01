@@ -186,6 +186,18 @@ inline auto evaluate(const Vec3 &wo, const Vec3 &wi, float alpha) -> float
 }
 
 /**
+ * \brief The fraction of incoming light this lobe reflects, with Fresnel taken as one.
+ *
+ * Below one, and increasingly so as roughness rises, because the model follows only a
+ * single bounce off the surface and discards light that would have bounced between facets
+ * before escaping. Used to put that energy back.
+ *
+ * \param cosThetaO Cosine between the view direction and the surface normal.
+ * \param roughness Surface roughness in [0, 1].
+ */
+auto directionalAlbedo(float cosThetaO, float roughness) -> float;
+
+/**
  * \brief The reflectance weight to carry when a direction was drawn from sampleVisibleNormal.
  *
  * The full expression is the distribution times masking times Fresnel over the two

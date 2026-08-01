@@ -29,9 +29,9 @@ target_link_libraries(furnace PRIVATE pt_core pt_warnings)
 add_test(NAME furnace COMMAND furnace ${CMAKE_CURRENT_SOURCE_DIR}/furnace_scene.json 20000)
 set_tests_properties(furnace PROPERTIES TIMEOUT 300)
 
-# The same check for a rough conductor. Single-scattering GGX loses energy as roughness
-# rises, because light bouncing more than once between microfacets is not modelled, so
-# this uses a low roughness where that loss is still under a percent. It covers the
+# The same check for a rough conductor, at a roughness where it means something. A single
+# bounce off the surface loses a great deal of light at 0.8, returning about 56% of it, so
+# this fails outright without the compensation that puts the rest back. It also covers the
 # microfacet sampling weight, which the diffuse furnace never touches.
 add_test(NAME furnace.metal COMMAND furnace ${CMAKE_CURRENT_SOURCE_DIR}/furnace_metal_scene.json 20000)
 set_tests_properties(furnace.metal PROPERTIES TIMEOUT 300)
