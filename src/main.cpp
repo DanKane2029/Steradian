@@ -56,10 +56,11 @@ void printUsage(const char *program)
               << "  --seed <n>         Base seed; the same seed and sample count reproduce\n"
               << "                     the same image regardless of thread count (default 1)\n"
               << "  --threads <n>      Worker threads (default: numThreads from the config)\n"
-              << "  --denoise [n]      Filter noise out of the saved image using the\n"
-              << "                     surface colour and normals as a guide (default 5\n"
-              << "                     passes). Approximates: fine lighting detail such as\n"
-              << "                     small caustics is softened\n"
+              << "  --denoise [n]      Filter noise using surface colour and normals as a\n"
+              << "                     guide (default 5 passes). Applies to both the saved\n"
+              << "                     image and the viewer, where it refreshes twice a\n"
+              << "                     second while the camera is still. Approximates: fine\n"
+              << "                     lighting detail such as small caustics is softened\n"
               << "  --denoise-strength <v>  How much radiance difference the filter blurs\n"
               << "                     across (default 0.10). Larger removes more noise and\n"
               << "                     more real shading with it\n"
@@ -253,6 +254,12 @@ auto main(int argc, char *argv[]) -> int
         }
 #endif
 
+        if (options.headless && options.denoiseIterations > 0 && options.outputPath.empty())
+        {
+            std::cerr << "Note: --denoise has no visible effect without --out, since the "
+                         "rendered image is discarded.\n";
+        }
+
         if (options.headless)
         {
             PixelBuffer pixelBuffer(config.windowWidth, config.windowHeight);
@@ -371,6 +378,20 @@ auto main(int argc, char *argv[]) -> int
         // the picture converges the longer the camera is left alone.
         unsigned int accumulated = 0;
 
+        // Denoising the live view costs real time, and the picture only changes slowly
+        // once it is accumulating, so it is refreshed on an interval rather than every
+        // frame. While the camera is moving the raw image is shown instead: it is about
+        // to be replaced anyway, and responsiveness matters more than smoothness.
+        std::vector<float> denoisedView;
+        double lastDenoise = 0.0;
+
+        // The gap between filter runs is derived from how long the last one took, so the
+        // cost stays a bounded share of the frame regardless of image size. A fixed
+        // interval works at small resolutions and collapses the frame rate at large ones,
+        // where a single pass can take longer than the interval itself.
+        double denoiseInterval = 0.5;
+        constexpr double denoiseBudgetFraction = 0.25;
+
         double lastFrameTime = glfwGetTime();
         double lastTitleUpdate = lastFrameTime;
 
@@ -425,6 +446,34 @@ auto main(int argc, char *argv[]) -> int
                 });
 
                 accumulated++;
+            }
+
+            if (options.denoiseIterations > 0)
+            {
+                if (restart)
+                {
+                    // The accumulation just reset, so anything previously filtered
+                    // describes a view that no longer exists.
+                    window.setDisplayOverride(nullptr);
+                    denoisedView.clear();
+                }
+                else if (accumulated > 0 && now - lastDenoise > denoiseInterval)
+                {
+                    Denoiser::Settings settings;
+                    settings.iterations = options.denoiseIterations;
+                    settings.colorSigma = options.denoiseStrength;
+
+                    const double denoiseStart = glfwGetTime();
+
+                    denoisedView = Denoiser::denoise(curSize.first, curSize.second, pixelBuffer.getPixels(),
+                                                     pixelBuffer.getAlbedo(), pixelBuffer.getNormals(), settings);
+
+                    window.setDisplayOverride(denoisedView.data());
+
+                    const double elapsed = glfwGetTime() - denoiseStart;
+                    denoiseInterval = std::max(0.5, elapsed / denoiseBudgetFraction);
+                    lastDenoise = glfwGetTime();
+                }
             }
 
             window.update();

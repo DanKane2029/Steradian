@@ -43,6 +43,14 @@ class Window
     void setTitle(const std::string &title);
 
     /**
+     * \brief Shows this image instead of the raw accumulated buffer.
+     *
+     * Used to display a denoised version of the render. Passing nullptr goes back to
+     * showing the buffer directly. The pointer must stay valid until it is replaced.
+     */
+    void setDisplayOverride(const float *pixels);
+
+    /**
      * \brief Reports and clears the "the window was resized" flag.
      *
      * Resizing reallocates the pixel buffer, so the caller has to know in order to
@@ -83,6 +91,9 @@ class Window
 
     /** 8-bit display image, tone mapped from the renderer's linear output */
     std::vector<unsigned char> m_DisplayPixels;
+
+    /** optional post-processed image to show in place of the raw buffer */
+    const float *m_DisplayOverride = nullptr;
 
     static void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
 };

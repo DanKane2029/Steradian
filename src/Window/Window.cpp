@@ -137,6 +137,11 @@ auto Window::getFrameBufferSize() -> std::pair<int, int>
     return std::make_pair(m_Data.m_FBWidth, m_Data.m_FBHeight);
 }
 
+void Window::setDisplayOverride(const float *pixels)
+{
+    m_DisplayOverride = pixels;
+}
+
 void Window::setTitle(const std::string &title)
 {
     glfwSetWindowTitle(m_Window, title.c_str());
@@ -172,7 +177,7 @@ void Window::present()
         return;
     }
 
-    const float *linear = m_Data.m_PixelBuffer->getPixels();
+    const float *linear = (m_DisplayOverride != nullptr) ? m_DisplayOverride : m_Data.m_PixelBuffer->getPixels();
     const auto pixelCount = static_cast<size_t>(width) * static_cast<size_t>(height);
 
     m_DisplayPixels.resize(pixelCount * 3);
