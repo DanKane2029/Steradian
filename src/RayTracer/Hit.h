@@ -1,7 +1,7 @@
 #pragma once
 #include "RayTracer/Ray.h"
 #include "Utils/Vec3.h"
-#include <string>
+#include <cstdint>
 
 /**
  * \brief The result of a ray object intersection.
@@ -42,11 +42,21 @@ struct Hit
     Vec3 normal{};
 
     /**
-     * \brief The name of the material of the scene object that intersected the ray.
+     * \brief Index of the material of the primitive that was hit.
      *
-     * The string identifier of the material of the scene object that the ray first intersected with.
+     * An index into the scene's material array rather than a name. Looking materials up
+     * by string meant a hash lookup and a string copy for every single intersection.
      */
-    std::string materialName;
+    uint32_t materialIndex = 0;
+
+    /**
+     * \brief Index into the scene's emitter list, or -1 when this is not a sampled emitter.
+     *
+     * The integrator needs to know whether a surface's emission was already accounted for
+     * by direct light sampling, so that it is not counted a second time when a scattered
+     * ray happens to land on it.
+     */
+    int32_t emitterIndex = -1;
 
     /**
      * \brief The texture coordinate at the hit position.

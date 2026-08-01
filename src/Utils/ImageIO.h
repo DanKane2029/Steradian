@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <string>
 
 /**
@@ -23,6 +24,14 @@ namespace ImageIO
  * \returns The sRGB-encoded value in [0, 1].
  */
 auto linearToSrgb(float linear) -> float;
+
+/**
+ * \brief Compresses unbounded linear radiance into displayable range.
+ *
+ * \param linearRgb Pointer to three linear channel values.
+ * \returns Tone mapped values in [0, 1].
+ */
+auto toneMap(const float *linearRgb) -> std::array<float, 3>;
 
 /**
  * \brief Writes a linear float RGB buffer to an 8-bit sRGB PNG.

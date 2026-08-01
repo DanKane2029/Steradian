@@ -1,9 +1,11 @@
 #pragma once
 #include <cstdint>
+#include <memory>
 #include <mutex>
 
 #include "Camera.h"
 #include "Hit.h"
+#include "RayTracer/Integrator.h"
 #include "Scene/Scene.h"
 #include "Utils/Config.h"
 #include "Utils/Random.h"
@@ -65,44 +67,12 @@ class RayTracer
      */
     void renderRows(int yStart, int yEnd, unsigned int samplesPerPixel, uint64_t seed);
 
-    /**
-     * \brief Shoots a ray into the scene.
-     *
-     * Shoots a ray into the scene and returns a Hit object that describes the ray object intersection.
-     *
-     * \param ray The ray being shot into the scene.
-     * \returns The hit object that describes the intersection if there is one.
-     */
-    auto shootRay(Ray ray) -> Hit;
-
-    /**
-     * \brief Calculates the color of a ray scene intersection.
-     *
-     * Calculates the color of a ray scene object intersection using the Blinn-Phong lighting calculation. The hit
-     * object is expected to be a real intersection between ray and scene object so the hit's 'isHit' member should
-     * always be true.
-     *
-     * \param hit The hit to calculate the color of.
-     * \param recurseLevel The current level of recursion used for reflection calculations.
-     * \returns The color of the hit as a Vector3.
-     */
-    auto getHitColor(Hit hit, unsigned int recurseLevel, Rng &rng) -> Vec3;
-
-    /**
-     * \brief Calculates if the position is in a shadow.
-     *
-     * Shoots multiple rays from a position in a cone towards a light source to see if that position is shadowed.
-     *
-     * \param light The light source that potentially casts a shadow on the position.
-     * \param pos The position where the rays are cast from to determine if it is in shadow.
-     * \returns A float value that determines how much the position is in shadow. 0 is completely in shadow and 1 is
-     * completly lit.
-     */
-    auto shootShadowRays(const std::shared_ptr<Light> &light, Vec3 pos, Vec3 normal, Rng &rng) -> float;
-
     void updateAspectRatio(float aspectRatio);
 
   private:
+    /** the path tracing integrator that estimates radiance along a camera ray */
+    std::unique_ptr<Integrator> m_Integrator;
+
     /**
      * \brief Computes the color of a single sample through the given pixel.
      *
@@ -123,9 +93,7 @@ class RayTracer
      */
     auto makeCameraRay(float u, float v) -> Ray;
 
-    unsigned int m_NumShadowRays = 5;
-    unsigned int m_ReflectionLimit = 100;
-    unsigned int m_MaxRecurseLevel = 10;
+    unsigned int m_MaxDepth = 10;
 
     float m_aspectRatio{};
 

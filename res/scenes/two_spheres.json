@@ -1,102 +1,85 @@
 {
-	"ambientLighting": [
-		0.2,
-		0.0,
-		0.0
-	],
-	"camera": {
-		"org": [
-			0,
-			0,
-			2.5
-		],
-		"lookAt": [
-			0,
-			0,
-			0
-		]
-	},
-	"materials": {
-		"mat1": {
-			"ambient": [
-				0.0,
-				0.2,
-				0.2
-			],
-			"diffuse": [
-				0.3,
-				0.3,
-				0.3
-			],
-			"specular": [
-				0.2,
-				0.2,
-				0.2
-			],
-			"specularExponent": 50,
-			"transparency": 0.0,
-			"refraction": 0.0,
-			"reflection": 0.5
-		},
-		"mat2": {
-			"ambient": [
-				0.2,
-				0.2,
-				0.0
-			],
-			"diffuse": [
-				1.0,
-				1.0,
-				1.0
-			],
-			"specular": [
-				0.2,
-				0.2,
-				0.2
-			],
-			"specularExponent": 100,
-			"transparency": 0.0,
-			"refraction": 0.0,
-			"reflection": 1.0
-		}
-	},
-	"objects": [
-		{
-			"type": "sphere",
-			"material": "mat1",
-			"center": [
-				-1,
-				0,
-				0
-			],
-			"radius": 1
-		},
-		{
-			"type": "sphere",
-			"material": "mat2",
-			"center": [
-				1,
-				0,
-				0
-			],
-			"radius": 1
-		}
-	],
-	"lights": [
-		{
-			"type": "point",
-			"pos": [
-				3,
-				3,
-				3
-			],
-			"color": [
-				0.3,
-				0.3,
-				0.3
-			],
-			"intensity": 81.0,
-			"radius": 0.1
-		}
-	]
+  "ambientLighting": [
+    0.45,
+    0.55,
+    0.75
+  ],
+  "camera": {
+    "org": [
+      0,
+      0.4,
+      4.0
+    ],
+    "lookAt": [
+      0,
+      0,
+      0
+    ],
+    "fov": 45
+  },
+  "materials": {
+    "matte": {
+      "type": "diffuse",
+      "albedo": [
+        0.75,
+        0.25,
+        0.25
+      ]
+    },
+    "mirror": {
+      "type": "metal",
+      "albedo": [
+        0.95,
+        0.85,
+        0.55
+      ],
+      "roughness": 0.05
+    },
+    "lamp": {
+      "type": "diffuse",
+      "albedo": [
+        0,
+        0,
+        0
+      ],
+      "emissive": [
+        18,
+        17,
+        15
+      ]
+    }
+  },
+  "objects": [
+    {
+      "type": "sphere",
+      "material": "matte",
+      "center": [
+        -1.05,
+        0,
+        0
+      ],
+      "radius": 1
+    },
+    {
+      "type": "sphere",
+      "material": "mirror",
+      "center": [
+        1.05,
+        0,
+        0
+      ],
+      "radius": 1
+    },
+    {
+      "type": "sphere",
+      "material": "lamp",
+      "center": [
+        0,
+        3.2,
+        1.5
+      ],
+      "radius": 0.6
+    }
+  ],
+  "lights": []
 }

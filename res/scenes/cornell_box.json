@@ -1,0 +1,291 @@
+{
+  "ambientLighting": [
+    0,
+    0,
+    0
+  ],
+  "camera": {
+    "org": [
+      0,
+      0,
+      3.6
+    ],
+    "lookAt": [
+      0,
+      0,
+      0
+    ],
+    "fov": 45
+  },
+  "materials": {
+    "white": {
+      "type": "diffuse",
+      "albedo": [
+        0.73,
+        0.73,
+        0.73
+      ]
+    },
+    "red": {
+      "type": "diffuse",
+      "albedo": [
+        0.65,
+        0.05,
+        0.05
+      ]
+    },
+    "green": {
+      "type": "diffuse",
+      "albedo": [
+        0.12,
+        0.45,
+        0.15
+      ]
+    },
+    "metal": {
+      "type": "metal",
+      "albedo": [
+        0.9,
+        0.9,
+        0.9
+      ],
+      "roughness": 0.0
+    },
+    "lamp": {
+      "type": "diffuse",
+      "albedo": [
+        0,
+        0,
+        0
+      ],
+      "emissive": [
+        26,
+        22,
+        18
+      ]
+    }
+  },
+  "objects": [
+    {
+      "type": "triangle",
+      "material": "white",
+      "point0": [
+        -1,
+        -1,
+        -1
+      ],
+      "point1": [
+        1,
+        -1,
+        -1
+      ],
+      "point2": [
+        1,
+        -1,
+        1
+      ]
+    },
+    {
+      "type": "triangle",
+      "material": "white",
+      "point0": [
+        -1,
+        -1,
+        -1
+      ],
+      "point1": [
+        1,
+        -1,
+        1
+      ],
+      "point2": [
+        -1,
+        -1,
+        1
+      ]
+    },
+    {
+      "type": "triangle",
+      "material": "white",
+      "point0": [
+        -1,
+        1,
+        1
+      ],
+      "point1": [
+        1,
+        1,
+        1
+      ],
+      "point2": [
+        1,
+        1,
+        -1
+      ]
+    },
+    {
+      "type": "triangle",
+      "material": "white",
+      "point0": [
+        -1,
+        1,
+        1
+      ],
+      "point1": [
+        1,
+        1,
+        -1
+      ],
+      "point2": [
+        -1,
+        1,
+        -1
+      ]
+    },
+    {
+      "type": "triangle",
+      "material": "white",
+      "point0": [
+        -1,
+        -1,
+        -1
+      ],
+      "point1": [
+        -1,
+        1,
+        -1
+      ],
+      "point2": [
+        1,
+        1,
+        -1
+      ]
+    },
+    {
+      "type": "triangle",
+      "material": "white",
+      "point0": [
+        -1,
+        -1,
+        -1
+      ],
+      "point1": [
+        1,
+        1,
+        -1
+      ],
+      "point2": [
+        1,
+        -1,
+        -1
+      ]
+    },
+    {
+      "type": "triangle",
+      "material": "red",
+      "point0": [
+        -1,
+        -1,
+        1
+      ],
+      "point1": [
+        -1,
+        1,
+        1
+      ],
+      "point2": [
+        -1,
+        1,
+        -1
+      ]
+    },
+    {
+      "type": "triangle",
+      "material": "red",
+      "point0": [
+        -1,
+        -1,
+        1
+      ],
+      "point1": [
+        -1,
+        1,
+        -1
+      ],
+      "point2": [
+        -1,
+        -1,
+        -1
+      ]
+    },
+    {
+      "type": "triangle",
+      "material": "green",
+      "point0": [
+        1,
+        -1,
+        -1
+      ],
+      "point1": [
+        1,
+        1,
+        -1
+      ],
+      "point2": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "type": "triangle",
+      "material": "green",
+      "point0": [
+        1,
+        -1,
+        -1
+      ],
+      "point1": [
+        1,
+        1,
+        1
+      ],
+      "point2": [
+        1,
+        -1,
+        1
+      ]
+    },
+    {
+      "type": "sphere",
+      "material": "white",
+      "center": [
+        -0.42,
+        -0.6,
+        -0.25
+      ],
+      "radius": 0.4
+    },
+    {
+      "type": "sphere",
+      "material": "metal",
+      "center": [
+        0.45,
+        -0.65,
+        0.28
+      ],
+      "radius": 0.35
+    },
+    {
+      "type": "sphere",
+      "material": "lamp",
+      "center": [
+        0,
+        1.15,
+        0
+      ],
+      "radius": 0.35
+    }
+  ],
+  "lights": []
+}

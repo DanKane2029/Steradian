@@ -1,65 +1,61 @@
 {
-	"ambientLighting": [
-		0.1,
-		0.1,
-		0.1
-	],
-	"camera": {
-		"org": [
-			0,
-			17,
-			4
-		],
-		"lookAt": [
-			0,
-			17,
-			0
-		]
-	},
-	"materials": {
-		"test": {
-			"ambient": [
-				0.2,
-				0.0,
-				0.0
-			],
-			"diffuse": [
-				0.7,
-				0.7,
-				0.7
-			],
-			"specular": [
-				0.0,
-				0.6,
-				0.5
-			],
-			"specularExponent": 100.0,
-			"transparency": 0.0,
-			"refraction": 1.0
-		}
-	},
-	"objects": [
-		{
-			"type": "objModel",
-			"path": "../models/man.obj",
-			"material": "test"
-		}
-	],
-	"lights": [
-		{
-			"type": "point",
-			"pos": [
-				5,
-				15,
-				5
-			],
-			"color": [
-				0.3,
-				0.3,
-				0.3
-			],
-			"intensity": 825.0,
-			"radius": 1
-		}
-	]
+  "ambientLighting": [
+    0.45,
+    0.55,
+    0.75
+  ],
+  "camera": {
+    "org": [
+      0,
+      17,
+      -14
+    ],
+    "lookAt": [
+      0,
+      15,
+      0
+    ],
+    "fov": 45
+  },
+  "materials": {
+    "skin": {
+      "type": "diffuse",
+      "albedo": [
+        0.7,
+        0.45,
+        0.4
+      ]
+    },
+    "lamp": {
+      "type": "diffuse",
+      "albedo": [
+        0,
+        0,
+        0
+      ],
+      "emissive": [
+        120,
+        115,
+        105
+      ]
+    }
+  },
+  "objects": [
+    {
+      "type": "objModel",
+      "material": "skin",
+      "path": "../models/man.obj"
+    },
+    {
+      "type": "sphere",
+      "material": "lamp",
+      "center": [
+        8,
+        26,
+        -10
+      ],
+      "radius": 1.5
+    }
+  ],
+  "lights": []
 }
