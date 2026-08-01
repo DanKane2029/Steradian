@@ -387,7 +387,17 @@ auto Integrator::radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) c
                                Sampling::fresnelSchlick(cosThetaD, albedo.y),
                                Sampling::fresnelSchlick(cosThetaD, albedo.z));
 
-            throughput *= fresnel * weight;
+            // Put back the light the single bounce dropped.
+            //
+            // Without this a rough conductor is simply too dark, and increasingly so with
+            // roughness, because energy that should have bounced between facets and
+            // eventually left the surface was absorbed instead. Scaling by how much the
+            // lobe actually reflects restores it, tinted by the surface, since light that
+            // bounces more than once is coloured more than once.
+            const float singleScatterAlbedo = Microfacet::directionalAlbedo(woLocal.z, material.roughness);
+            const Vec3 compensation = Vec3(1.0f, 1.0f, 1.0f) + (albedo * ((1.0f / singleScatterAlbedo) - 1.0f));
+
+            throughput *= fresnel * weight * compensation;
 
             nextDirection = Sampling::toWorld(wiLocal, t, b, hit.normal);
             previousBsdfPdf = Microfacet::pdf(woLocal, wiLocal, alpha);

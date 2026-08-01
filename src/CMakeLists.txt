@@ -15,6 +15,7 @@ add_library(pt_core STATIC
     Utils/Config.cpp
     Utils/Denoiser.cpp
     Utils/ImageIO.cpp
+    Utils/Microfacet.cpp
     Utils/ObjModel.cpp
     Utils/Stats.cpp
     Window/PixelBuffer.cpp

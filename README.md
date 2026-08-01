@@ -228,6 +228,17 @@ Roughness is a real microfacet model rather than a blurred mirror, which matters
 than looks. It gives glossy surfaces an evaluable probability density, and without one they
 cannot take part in the importance sampling above at all.
 
+A microfacet model follows light striking a surface, bouncing once, and leaving. Light that
+would have bounced between facets before escaping is simply dropped, and the rougher the
+surface the more of it there is, which makes rough metal render too dark. How much is lost
+is measured at startup, by sampling the renderer's own scattering routine rather than
+taking a published fit, and put back:
+
+| Roughness | 0.4 | 0.6 | 0.8 | 1.0 |
+| --- | --- | --- | --- | --- |
+| Reflected, single bounce only | 0.96 | 0.82 | 0.56 | 0.32 |
+| Reflected, with the rest restored | 1.00 | 1.00 | 1.00 | 0.96 |
+
 ### Finding what a ray hits
 
 <p align="center">
@@ -423,10 +434,6 @@ and therefore continuous integration, possible.
 
 ## Known limitations
 
-- **Rough conductors lose energy.** Light bouncing more than once between microfacets is
-  not modelled, so rough metal comes out darker than it should. Negligible below about 0.4
-  roughness and severe above it: a fully reflective conductor returns 96% of the light at
-  0.4 roughness and 32% at 1.0. The fix is a multiple-scattering compensation term.
 - **Dielectric surfaces are smooth.** Roughness applies to conductors, so frosted or
   etched glass is not available.
 - **Direct light sampling covers spherical emitters only.** Emissive geometry of other
