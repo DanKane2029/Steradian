@@ -21,6 +21,7 @@ compile_commands.json
 *.png
 !res/textures/*.png
 !tests/golden/*.png
+!docs/*.png
 
 # visual studio
 .vs
