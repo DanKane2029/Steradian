@@ -1,65 +1,61 @@
 {
-	"ambientLighting": [
-		0.1,
-		0.1,
-		0.1
-	],
-	"camera": {
-		"org": [
-			0,
-			0,
-			-2
-		],
-		"lookAt": [
-			0,
-			0,
-			0
-		]
-	},
-	"materials": {
-		"test": {
-			"ambient": [
-				0.2,
-				0.0,
-				0.0
-			],
-			"diffuse": [
-				0.7,
-				0.7,
-				0.7
-			],
-			"specular": [
-				0.0,
-				0.6,
-				0.5
-			],
-			"specularExponent": 100.0,
-			"transparency": 0.0,
-			"refraction": 1.0
-		}
-	},
-	"objects": [
-		{
-			"type": "objModel",
-			"path": "../models/ball.obj",
-			"material": "test"
-		}
-	],
-	"lights": [
-		{
-			"type": "point",
-			"pos": [
-				3,
-				3,
-				-5
-			],
-			"color": [
-				0.3,
-				0.3,
-				0.3
-			],
-			"intensity": 129.0,
-			"radius": 1
-		}
-	]
+  "ambientLighting": [
+    0.45,
+    0.55,
+    0.75
+  ],
+  "camera": {
+    "org": [
+      0,
+      0,
+      -2.6
+    ],
+    "lookAt": [
+      0,
+      0,
+      0
+    ],
+    "fov": 45
+  },
+  "materials": {
+    "shell": {
+      "type": "diffuse",
+      "albedo": [
+        0.75,
+        0.35,
+        0.3
+      ]
+    },
+    "lamp": {
+      "type": "diffuse",
+      "albedo": [
+        0,
+        0,
+        0
+      ],
+      "emissive": [
+        28,
+        27,
+        25
+      ]
+    }
+  },
+  "objects": [
+    {
+      "type": "objModel",
+      "material": "shell",
+      "path": "../models/ball.obj"
+    },
+    {
+      "type": "sphere",
+      "material": "lamp",
+      "center": [
+        2.2,
+        2.4,
+        -2.6
+      ],
+      "radius": 0.5
+    }
+  ],
+  "lights": []
 }

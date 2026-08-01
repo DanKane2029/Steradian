@@ -7,7 +7,6 @@
 #include <stdexcept>
 using json = nlohmann::json;
 
-#include "Scene/Light.h"
 #include "Scene/SceneObject.h"
 #include "Utils/ObjModel.h"
 
@@ -67,83 +66,57 @@ auto Scene::getObjectList() -> const std::vector<std::shared_ptr<SceneObject>> &
 }
 
 /**
- * add a scene object to the scene
+ * adds a scene object to the scene
  *
- * \param sceneObject - the pointer of the scene object to be added
- * \param materialName - the name of the registered material of the added scene
- * object
+ * \param sceneObject - the object to add
+ * \param materialIndex - index of its material in the scene's material array
  */
-void Scene::addObject(std::shared_ptr<SceneObject> sceneObject, std::string materialName)
+void Scene::addObject(std::shared_ptr<SceneObject> sceneObject, uint32_t materialIndex)
 {
-    sceneObject->setMaterialName(materialName);
+    sceneObject->setMaterialIndex(materialIndex);
     m_ObjectList.push_back(sceneObject);
 }
 
 /**
- * adds multiple scene objects to the scene
- *
- * \param sceneObjectList - a list of scene object to be added
- * \param materialNmae - the name of the registered material of the added scene
- * objects
+ * adds multiple scene objects sharing one material
  */
-void Scene::addObjects(std::vector<std::shared_ptr<SceneObject>> sceneObjectList, std::string materialName)
+void Scene::addObjects(const std::vector<std::shared_ptr<SceneObject>> &sceneObjectList, uint32_t materialIndex)
 {
-    for (std::shared_ptr<SceneObject> sceneObject : sceneObjectList)
+    for (const std::shared_ptr<SceneObject> &sceneObject : sceneObjectList)
     {
-        addObject(sceneObject, materialName);
+        addObject(sceneObject, materialIndex);
     }
 }
 
 /**
- * returns the list of lights in the scene
- *
- * \return - the list of light pointers in the scene
+ * registers a material and returns the index used to refer to it
  */
-auto Scene::getLightList() -> const std::vector<std::shared_ptr<Light>> &
+auto Scene::registerMaterial(const Material &material) -> uint32_t
 {
-    return m_LightList;
+    const auto index = static_cast<uint32_t>(m_Materials.size());
+
+    m_Materials.push_back(material);
+    m_MaterialIndices[material.name] = index;
+
+    return index;
 }
 
 /**
- * adds a light to the scene
+ * resolves a material name to its index
  *
- * \param light - the pointer to the light to be added to the scene
+ * Used only while loading a scene. A missing material is a scene authoring error, so it
+ * reports the name rather than failing anonymously.
  */
-void Scene::addLight(std::shared_ptr<Light> light)
+auto Scene::materialIndexByName(const std::string &name) const -> uint32_t
 {
-    m_LightList.push_back(light);
-}
+    const auto it = m_MaterialIndices.find(name);
 
-/**
- * adds a material to the scene's material store to be used and reused
- * in the scene
- *
- * \param material - the pointer to the material to be registered
- */
-void Scene::registerMaterial(Material material)
-{
-    m_MaterialStore[material.name] = std::make_shared<Material>(material);
-}
-
-/**
- * returns an already registered material in the scene's material store
- *
- * \param materialName - the name of the desired material
- * \return - a pointer to the desired material
- */
-auto Scene::getMaterial(std::string materialName) -> std::shared_ptr<Material>
-{
-    auto it = m_MaterialStore.find(materialName);
-
-    if (it == m_MaterialStore.end())
+    if (it == m_MaterialIndices.end())
     {
-        std::cout << "Material Not Found!" << std::endl;
-        exit(EXIT_FAILURE);
+        throw std::runtime_error("Scene refers to unknown material '" + name + "'");
     }
-    else
-    {
-        return m_MaterialStore.at(materialName);
-    }
+
+    return it->second;
 }
 
 /**
@@ -197,19 +170,72 @@ Scene::Scene(std::string filePath)
     json materials = data.at(m_keywords.materials);
     for (auto it = materials.begin(); it != materials.end(); ++it)
     {
-        std::string name = it.key();
-        json materialData = it.value();
+        const std::string name = it.key();
+        const json &materialData = it.value();
 
-        Vec3 ambient = materialData.at("ambient").get<std::vector<float>>();
-        Vec3 diffuse = materialData.at("diffuse").get<std::vector<float>>();
-        Vec3 specular = materialData.at("specular").get<std::vector<float>>();
+        Material material(name);
 
-        float specularExponent = optionalFloat(materialData, "specularExponent", 1.0f);
-        float transparency = optionalFloat(materialData, "transparency", 0.0f);
-        float refraction = optionalFloat(materialData, "refraction", 1.0f);
-        float reflection = optionalFloat(materialData, "reflection", 0.0f);
+        // New-style fields describe scattering directly. Older scenes describe
+        // Blinn-Phong shading instead, so those fields are mapped onto the closest
+        // equivalent rather than being rejected.
+        if (materialData.contains("albedo"))
+        {
+            material.albedo = Vec3(materialData.at("albedo").get<std::vector<float>>());
+        }
+        else if (materialData.contains("diffuse"))
+        {
+            material.albedo = Vec3(materialData.at("diffuse").get<std::vector<float>>());
+        }
 
-        Material material(name, ambient, diffuse, specular, specularExponent, transparency, refraction, reflection);
+        if (materialData.contains("emissive"))
+        {
+            material.emissive = Vec3(materialData.at("emissive").get<std::vector<float>>());
+        }
+
+        material.roughness = optionalFloat(materialData, "roughness", 0.0f);
+        material.ior = optionalFloat(materialData, "refraction", 1.5f);
+        material.ior = optionalFloat(materialData, "ior", material.ior);
+
+        if (materialData.contains("type"))
+        {
+            const std::string typeName = materialData.at("type");
+
+            if (typeName == "metal")
+            {
+                material.type = Material::Type::Metal;
+            }
+            else if (typeName == "dielectric" || typeName == "glass")
+            {
+                material.type = Material::Type::Dielectric;
+            }
+            else
+            {
+                material.type = Material::Type::Diffuse;
+            }
+        }
+        else
+        {
+            // Infer from the old fields: `transparency` meant glass, and `reflection`
+            // meant a mirror-like surface.
+            const float transparency = optionalFloat(materialData, "transparency", 0.0f);
+            const float reflection = optionalFloat(materialData, "reflection", 0.0f);
+
+            if (transparency > 0.0f)
+            {
+                material.type = Material::Type::Dielectric;
+            }
+            else if (reflection > 0.5f)
+            {
+                material.type = Material::Type::Metal;
+                material.roughness = 1.0f - reflection;
+            }
+        }
+
+        if (materialData.contains("texture"))
+        {
+            material.texture = Texture(resolveAssetPath(materialData.at("texture"), sceneDir));
+        }
+
         registerMaterial(material);
     }
 
@@ -217,7 +243,7 @@ Scene::Scene(std::string filePath)
     for (json object : objectList)
     {
         std::string type = object.at("type");
-        std::string materialId = object.at("material");
+        const uint32_t materialId = materialIndexByName(object.at("material"));
         if (type == "objModel")
         {
             std::string path = resolveAssetPath(object.at("path"), sceneDir);
@@ -247,23 +273,62 @@ Scene::Scene(std::string filePath)
         {
             Vec3 center(object.at("center").get<std::vector<float>>());
             float radius = object.at("radius");
-            addObject(std::make_shared<Sphere>(center, radius), materialId);
+
+            auto sphere = std::make_shared<Sphere>(center, radius);
+
+            // An emissive sphere is an area light. Registering it lets direct lighting
+            // sample it, which is what keeps small bright sources from being extremely
+            // noisy.
+            const Material &material = m_Materials[materialId];
+            if (material.isEmissive() && radius > 0.0f)
+            {
+                sphere->setEmitterIndex(static_cast<int32_t>(m_Emitters.size()));
+                m_Emitters.push_back(Emitter{center, radius, material.emissive});
+            }
+
+            addObject(sphere, materialId);
         }
     }
 
-    std::vector<json> lightList = data.at(m_keywords.lights);
-    for (json light : lightList)
+    // Point lights become emissive spheres.
+    //
+    // A path tracer gathers light by intersecting geometry, and a point has no area for a
+    // ray to land on, so a true point light can never be seen by a scattered ray. The
+    // scene format already gave lights a radius (it drove soft shadows), which makes the
+    // conversion natural: the light becomes a sphere that emits.
+    //
+    // Intensity was defined against an inverse-square falloff applied at the shading
+    // point. Emitted radiance is that power spread over the sphere's surface, so the
+    // conversion divides by the area to keep authored scenes looking about right.
+    if (data.contains(m_keywords.lights))
     {
-        std::string type = light.at("type");
-        if (type == "point")
+        for (const json &light : data.at(m_keywords.lights))
         {
-            Vec3 pos(light.at("pos").get<std::vector<float>>());
-            Vec3 color(light.at("color").get<std::vector<float>>());
-            float intensity = light.at("intensity");
-            float radius = light.at("radius");
-            // Constructed as a PointLight: wrapping it in make_shared<Light> sliced the derived
-            // object away.
-            addLight(std::make_shared<PointLight>(pos, color, intensity, radius));
+            const std::string type = light.at("type");
+            if (type != "point")
+            {
+                continue;
+            }
+
+            const Vec3 pos(light.at("pos").get<std::vector<float>>());
+            const Vec3 color(light.at("color").get<std::vector<float>>());
+            const float intensity = optionalFloat(light, "intensity", 1.0f);
+            const float radius = std::max(optionalFloat(light, "radius", 0.1f), 1e-3f);
+
+            const float area = 4.0f * static_cast<float>(M_PI) * radius * radius;
+            const Vec3 emission = color * (intensity / area);
+
+            Material lightMaterial("__light_" + std::to_string(m_Emitters.size()));
+            lightMaterial.emissive = emission;
+            lightMaterial.albedo = Vec3(0.0f, 0.0f, 0.0f);
+
+            const uint32_t materialIndex = registerMaterial(lightMaterial);
+
+            auto sphere = std::make_shared<Sphere>(pos, radius);
+            sphere->setEmitterIndex(static_cast<int32_t>(m_Emitters.size()));
+            m_Emitters.push_back(Emitter{pos, radius, emission});
+
+            addObject(sphere, materialIndex);
         }
     }
 }

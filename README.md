@@ -3,12 +3,11 @@
 A from-scratch CPU renderer in C++.
 
 Named for the SI unit of solid angle — integrating incoming radiance over the hemisphere
-above a surface is the thing the renderer is being built to do.
+above a surface is exactly what it does.
 
-> **Status: not yet a path tracer.** Today the renderer is **Whitted-style**: Blinn-Phong
-> direct lighting, perfect-mirror reflections and stochastic soft shadows. There is no
-> Monte Carlo path integral, no BRDF importance sampling and no global illumination. The
-> roadmap below tracks the work to get there, and this note will change when it lands.
+It is a **Monte Carlo path tracer**: light is estimated by following paths from the
+camera through the scene, so indirect illumination, colour bleeding and soft shadows come
+out of the method itself rather than being approximated.
 
 ## Roadmap
 
@@ -18,17 +17,50 @@ above a surface is the thing the renderer is being built to do.
 | 1 | Golden-image regression tests, CI, BVH/ray instrumentation | done |
 | 2 | Correctness pass: camera basis and real FOV, ray epsilons, OBJ triangulation, textures | done |
 | 3 | Performance: flat SAH BVH that actually culls, occlusion queries, thread pool | done |
-| 4 | Replace the integrator with Monte Carlo path tracing: hemisphere sampling, BSDFs, area lights, tonemapping | planned |
+| 4 | Monte Carlo path tracing: hemisphere sampling, BSDFs, area lights, tone mapping | done |
 
-### Known issues being worked through
+### How it works
 
-These are real and measured, not speculative:
+Paths start at the camera and scatter until they escape the scene or are terminated by
+Russian roulette. Each vertex carries a throughput term, so light that has bounced off
+other surfaces is carried along the path rather than approximated by a constant.
 
-- **Shading is Blinn-Phong, not a BSDF.** No energy conservation, no importance sampling, and
-  ambient light is added as a flat constant rather than being derived from the scene.
-- **The `transparency` and `refraction` material fields are parsed and ignored.** Dielectrics
-  come with the integrator work in Stage 4.
-- **No tone mapping.** Linear radiance is clamped at 1.0 on output, so highlights hard-clip.
+- **Cosine-weighted hemisphere sampling** for diffuse surfaces. The rendering equation
+  already contains a cosine factor, so drawing samples proportional to it makes the two
+  cancel: a diffuse bounce reduces to multiplying by albedo, with no variance from the
+  cosine at all.
+- **Direct light sampling** at every diffuse vertex, aimed at the cone each spherical
+  emitter subtends. Waiting for a scattered ray to land on a small bright light by chance
+  is what makes naive path tracers so noisy.
+- **Russian roulette** past the third bounce, terminating low-contribution paths at random
+  and scaling survivors up to compensate, which costs nothing in bias.
+- **Stratified pixel samples**, one per cell of a jittered grid rather than independent
+  draws that clump together by chance.
+- **ACES tone mapping** then sRGB encode on output. A path tracer produces unbounded
+  radiance; clamping at 1.0 turns every highlight into flat white.
+
+### Materials
+
+| `type` | Meaning |
+| --- | --- |
+| `diffuse` | Lambertian. `albedo` is the reflectance |
+| `metal` | Specular reflection tinted by `albedo`, blurred by `roughness` |
+| `dielectric` | Glass: refracts with Fresnel-weighted reflection, controlled by `ior` |
+
+Any material with a non-zero `emissive` is a light. Scenes written against the older
+Blinn-Phong fields (`diffuse`, `specular`, `reflection`, `transparency`) still load and
+are mapped onto the closest equivalent.
+
+### Known limitations
+
+- **Direct light sampling covers spherical emitters only.** Emissive geometry of other
+  shapes still lights the scene correctly through ordinary path tracing, just with more
+  noise.
+- **No multiple importance sampling.** Light sampling handles diffuse surfaces and BSDF
+  sampling handles specular ones, but the two are not combined, so a rough metal under a
+  large light is noisier than it needs to be.
+- **Roughness is a direction perturbation, not a microfacet model.** It looks plausible
+  but is not a physically derived GGX lobe.
 
 ## Building
 
@@ -181,6 +213,11 @@ The suite runs in about two seconds and covers three things:
   must return exactly what a brute-force scan over every primitive returns. Golden images
   prove the final picture is right; this proves the structure itself is not quietly
   dropping or inventing intersections, which is precisely what the octree it replaced did.
+- **A white furnace test.** A surface that reflects all light, placed in an environment of
+  uniform radiance, must render as exactly that environment and vanish into it. Nearly
+  every integrator mistake — a dropped cosine, a density applied the wrong way round, a
+  bounce that loses throughput — makes the sphere visible, so this one test covers a great
+  deal of ground.
 
 Because renders are deterministic, the image tolerances are deliberately tight (max one
 channel level, mean 0.02). Those numbers were picked against a measurement rather than

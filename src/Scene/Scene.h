@@ -5,7 +5,6 @@
 #include <vector>
 
 #include "BVH.h"
-#include "Light.h"
 #include "Material.h"
 #include "RayTracer/Camera.h"
 #include "SceneObject.h"
@@ -18,6 +17,21 @@ class Scene
 {
   public:
     Scene(std::string filePath);
+
+  public:
+    /**
+     * \brief A light that direct lighting samples explicitly.
+     *
+     * Spherical, because that is the shape the scene format already describes and it is
+     * cheap to sample uniformly. Emissive geometry of other shapes still lights the scene
+     * through ordinary path tracing, just with more noise.
+     */
+    struct Emitter
+    {
+        Vec3 center;
+        float radius = 0.0f;
+        Vec3 emission;
+    };
 
   private:
     struct Keywords
@@ -36,26 +50,47 @@ class Scene
     Vec3 m_AmbientLighting;
 
     std::vector<std::shared_ptr<SceneObject>> m_ObjectList{};
-    std::vector<std::shared_ptr<Light>> m_LightList{};
-    std::unordered_map<std::string, std::shared_ptr<Material>> m_MaterialStore{};
+
+    // Materials live in one array and are referenced by index. The name map is used only
+    // while loading; nothing looks a material up by string once rendering starts.
+    std::vector<Material> m_Materials{};
+    std::unordered_map<std::string, uint32_t> m_MaterialIndices{};
+
+    std::vector<Emitter> m_Emitters{};
 
     std::shared_ptr<BVH> m_AcceleratedStructure{};
     Camera m_Camera;
 
   public:
     auto getObjectList() -> const std::vector<std::shared_ptr<SceneObject>> &;
-    void addObject(std::shared_ptr<SceneObject> sceneObject, std::string materialName);
-    void addObjects(std::vector<std::shared_ptr<SceneObject>> sceneObjectList, std::string materialName);
+    void addObject(std::shared_ptr<SceneObject> sceneObject, uint32_t materialIndex);
+    void addObjects(const std::vector<std::shared_ptr<SceneObject>> &sceneObjectList, uint32_t materialIndex);
 
-    auto getLightList() -> const std::vector<std::shared_ptr<Light>> &;
-    void addLight(std::shared_ptr<Light> light);
+    /** registers a material and returns the index it can be referenced by */
+    auto registerMaterial(const Material &material) -> uint32_t;
 
-    void registerMaterial(Material material);
-    auto getMaterial(std::string materialName) -> std::shared_ptr<Material>;
+    /** looks a material index up by name; load-time only */
+    auto materialIndexByName(const std::string &name) const -> uint32_t;
 
-    static Scene loadFromJson(std::string filePath);
+    auto getMaterialByIndex(uint32_t index) const -> const Material &
+    {
+        return m_Materials[index];
+    }
 
-    auto inline getAmbientLighting() -> Vec3
+    /** the emitters direct lighting samples explicitly */
+    auto getEmitters() const -> const std::vector<Emitter> &
+    {
+        return m_Emitters;
+    }
+
+    /**
+     * radiance arriving from every direction where no geometry is hit
+     *
+     * Under the path integrator this is a uniform environment light rather than a
+     * constant added to every surface: it is occluded by geometry and bounces like any
+     * other light.
+     */
+    auto inline getAmbientLighting() const -> Vec3
     {
         return m_AmbientLighting;
     };

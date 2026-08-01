@@ -6,9 +6,9 @@
 # framebuffer with no windowing dependency, so it belongs to the core. Only Window.cpp
 # actually needs GLFW/OpenGL, and that is the one file split into the viewer target.
 add_library(pt_core STATIC
+    RayTracer/Integrator.cpp
     RayTracer/RayTracer.cpp
     Scene/BVH.cpp
-    Scene/Light.cpp
     Scene/Scene.cpp
     Scene/SceneObject.cpp
     Scene/Texture.cpp

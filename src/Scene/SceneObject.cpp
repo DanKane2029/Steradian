@@ -13,11 +13,6 @@
  *
  * \param name - name of the material as a string
  */
-void SceneObject::setMaterialName(std::string &name)
-{
-    m_MaterialName = name;
-}
-
 // TRIANGLE
 
 /**
@@ -221,7 +216,8 @@ auto Triangle::rayIntersect(Ray ray) -> Hit
     if (ray.isValidHit(t))
     {
         hit.isHit = true;
-        hit.materialName = m_MaterialName;
+        hit.materialIndex = m_MaterialIndex;
+        hit.emitterIndex = m_EmitterIndex;
         hit.time = t;
         hit.position = ray.posAt(t);
 
@@ -341,7 +337,8 @@ auto Sphere::rayIntersect(Ray ray) -> Hit
     }
 
     hit.isHit = true;
-    hit.materialName = m_MaterialName;
+    hit.materialIndex = m_MaterialIndex;
+    hit.emitterIndex = m_EmitterIndex;
     hit.time = t;
     hit.position = ray.posAt(t);
     hit.normal = getNormal(hit.position);

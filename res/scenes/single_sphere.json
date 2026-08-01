@@ -1,80 +1,66 @@
 {
-	"ambientLighting": [
-		0.1,
-		0.1,
-		0.1
-	],
-	"camera": {
-		"org": [
-			0,
-			0,
-			2
-		],
-		"lookAt": [
-			0,
-			0,
-			0
-		]
-	},
-	"materials": {
-		"test": {
-			"ambient": [
-				0.2,
-				0.0,
-				0.0
-			],
-			"diffuse": [
-				0.7,
-				0.7,
-				0.7
-			],
-			"specular": [
-				0.0,
-				0.6,
-				0.5
-			],
-			"specularExponent": 100.0,
-			"transparency": 0.0,
-			"refraction": 1.0
-		}
-	},
-	"objects": [
-		{
-			"type": "sphere",
-			"material": "test",
-			"center": [
-				0,
-				0,
-				0
-			],
-			"radius": 1
-		},
-		{
-			"type": "sphere",
-			"material": "test",
-			"center": [
-				1,
-				1,
-				1
-			],
-			"radius": 0.5
-		}
-	],
-	"lights": [
-		{
-			"type": "point",
-			"pos": [
-				1,
-				1,
-				1
-			],
-			"color": [
-				0.3,
-				0.3,
-				0.3
-			],
-			"intensity": 9.0,
-			"radius": 1
-		}
-	]
+  "ambientLighting": [
+    0.45,
+    0.55,
+    0.75
+  ],
+  "camera": {
+    "org": [
+      0,
+      0.3,
+      3.2
+    ],
+    "lookAt": [
+      0,
+      0,
+      0
+    ],
+    "fov": 45
+  },
+  "materials": {
+    "matte": {
+      "type": "diffuse",
+      "albedo": [
+        0.8,
+        0.45,
+        0.35
+      ]
+    },
+    "lamp": {
+      "type": "diffuse",
+      "albedo": [
+        0,
+        0,
+        0
+      ],
+      "emissive": [
+        25,
+        24,
+        22
+      ]
+    }
+  },
+  "objects": [
+    {
+      "type": "sphere",
+      "material": "matte",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 1
+    },
+    {
+      "type": "sphere",
+      "material": "lamp",
+      "center": [
+        2.0,
+        2.6,
+        1.8
+      ],
+      "radius": 0.5
+    }
+  ],
+  "lights": []
 }

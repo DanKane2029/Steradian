@@ -11,8 +11,9 @@ RayTracer::RayTracer(PixelBuffer *pixelBuffer, Scene *scene, Config &config)
     auto size = m_PixelBuffer->getSize();
 
     m_aspectRatio = (float)size.first / (float)size.second;
-    m_NumShadowRays = config.numShadowRays;
-    m_MaxRecurseLevel = config.maxRecurseLevel;
+    m_MaxDepth = config.maxRecurseLevel;
+
+    m_Integrator = std::make_unique<Integrator>(scene, m_MaxDepth);
 }
 
 RayTracer::~RayTracer() = default;
@@ -28,11 +29,6 @@ auto RayTracer::makeCameraRay(float u, float v) -> Ray
 
     // Half-extents of the film plane at unit distance. The vertical half-height follows
     // from the field of view; the horizontal one is that scaled by the aspect ratio.
-    //
-    // Previously the field of view was derived from the pixel count rather than from the
-    // scene (which pinned it at roughly 90 degrees regardless of configuration) and the
-    // aspect ratio was then applied on top of a term already derived from the width, so
-    // it was counted twice and the image came out horizontally stretched.
     const float halfHeight = std::tan(camera.fovY * 0.5f);
     const float halfWidth = halfHeight * m_aspectRatio;
 
@@ -54,15 +50,7 @@ auto RayTracer::samplePixel(int ix, int iy, float jitterX, float jitterY, Rng &r
     const float u = (static_cast<float>(ix) + jitterX) / static_cast<float>(size.first);
     const float v = (static_cast<float>(iy) + jitterY) / static_cast<float>(size.second);
 
-    Ray ray = makeCameraRay(u, v);
-    Hit hit = shootRay(ray);
-
-    if (!hit.isHit)
-    {
-        return {};
-    }
-
-    return getHitColor(hit, 0, rng);
+    return m_Integrator->radiance(makeCameraRay(u, v), rng);
 }
 
 void RayTracer::sampleScene(float x, float y)
@@ -72,11 +60,11 @@ void RayTracer::sampleScene(float x, float y)
     const int ix = static_cast<int>(floorf(static_cast<float>(size.first - 1) * x));
     const int iy = static_cast<int>(floorf(static_cast<float>(size.second - 1) * y));
 
-    // The interactive viewer samples random points from several threads at once, so
-    // each thread needs its own generator rather than a shared one.
+    // The interactive viewer samples random points from several threads at once, so each
+    // thread needs its own generator rather than a shared one.
     static thread_local Rng rng(0x9e3779b97f4a7c15ULL, reinterpret_cast<uintptr_t>(&rng));
 
-    const Vec3 color = samplePixel(ix, iy, 0.5f, 0.5f, rng);
+    const Vec3 color = samplePixel(ix, iy, rng.nextFloat(), rng.nextFloat(), rng);
 
     m_PixelBufferGuard.lock();
     m_PixelBuffer->setPixel(ix, iy, color);
@@ -92,18 +80,44 @@ void RayTracer::renderRows(int yStart, int yEnd, unsigned int samplesPerPixel, u
     // path stays lock-free.
     Stats::resetThread();
 
+    // Samples are stratified over a grid rather than drawn independently. Independent
+    // samples clump together by chance, leaving parts of the pixel uncovered; placing one
+    // sample in each cell of a grid and jittering within the cell covers the pixel far
+    // more evenly and converges faster for the same sample count.
+    auto strataPerAxis = static_cast<unsigned int>(std::sqrt(static_cast<float>(samplesPerPixel)));
+    if (strataPerAxis == 0)
+    {
+        strataPerAxis = 1;
+    }
+    const unsigned int stratifiedSamples = strataPerAxis * strataPerAxis;
+
     for (int iy = yStart; iy < yEnd; iy++)
     {
-        // Seeding per row rather than per thread is what makes the output independent
-        // of how the image was divided up between workers.
+        // Seeding per row rather than per thread is what makes the output independent of
+        // how the image was divided up between workers.
         Rng rng(seed, static_cast<uint64_t>(iy));
 
         for (int ix = 0; ix < width; ix++)
         {
             for (unsigned int s = 0; s < samplesPerPixel; s++)
             {
-                const float jitterX = (samplesPerPixel == 1) ? 0.5f : rng.nextFloat();
-                const float jitterY = (samplesPerPixel == 1) ? 0.5f : rng.nextFloat();
+                float jitterX = 0.0f;
+                float jitterY = 0.0f;
+
+                if (s < stratifiedSamples)
+                {
+                    const unsigned int sx = s % strataPerAxis;
+                    const unsigned int sy = s / strataPerAxis;
+
+                    jitterX = (static_cast<float>(sx) + rng.nextFloat()) / static_cast<float>(strataPerAxis);
+                    jitterY = (static_cast<float>(sy) + rng.nextFloat()) / static_cast<float>(strataPerAxis);
+                }
+                else
+                {
+                    // Any samples beyond a full grid are taken uniformly.
+                    jitterX = rng.nextFloat();
+                    jitterY = rng.nextFloat();
+                }
 
                 m_PixelBuffer->setPixel(ix, iy, samplePixel(ix, iy, jitterX, jitterY, rng));
             }
@@ -111,127 +125,4 @@ void RayTracer::renderRows(int yStart, int yEnd, unsigned int samplesPerPixel, u
     }
 
     Stats::mergeThread();
-}
-
-auto RayTracer::shootRay(Ray ray) -> Hit
-{
-    Stats::countRay();
-
-    Hit hit = m_Scene->getAccelerationStructure()->intersect(ray);
-    hit.ray = ray;
-    return hit;
-}
-
-auto RayTracer::getHitColor(Hit hit, unsigned int recurseLevel, Rng &rng) -> Vec3
-{
-    if (recurseLevel > m_MaxRecurseLevel)
-    {
-        return Vec3{};
-    }
-
-    Material mat = *m_Scene->getMaterial(hit.materialName);
-
-    Vec3 finalColor = 0;
-
-    finalColor += m_Scene->getAmbientLighting() + mat.ambient;
-
-    const Vec3 viewDir = (m_Scene->getCamera().org - hit.position).normalized();
-
-    for (const std::shared_ptr<Light> &light : m_Scene->getLightList())
-    {
-        const Vec3 toLight = light->getPos() - hit.position;
-        const float lightDist = toLight.length();
-        const Vec3 lightDir = toLight.normalized();
-
-        const float nDotL = lightDir.dot(hit.normal);
-
-        // Nothing to add for a surface facing away from the light, and evaluating the
-        // specular term there produced highlights on geometry the light cannot reach.
-        if (nDotL <= 0.0f)
-        {
-            continue;
-        }
-
-        // Inverse-square falloff. This previously read intensity^2 / distance, which is
-        // neither physical nor what the scene files were authored against.
-        const float falloff = light->getIntensity() / std::max(lightDist * lightDist, 1e-6f);
-        const Vec3 radiance = light->getColor() * falloff;
-
-        const Vec3 diffuse = radiance * nDotL * mat.diffuse;
-
-        // Specular component (Blinn-Phong). The base is clamped to zero: powf with a
-        // negative base and a fractional exponent returns NaN, which then propagated
-        // through the running pixel average and poisoned everything it touched.
-        const Vec3 halfWay = (lightDir + viewDir).normalized();
-        const float nDotH = std::max(hit.normal.dot(halfWay), 0.0f);
-        const Vec3 specular = mat.specular * radiance * std::pow(nDotH, mat.specularExponent);
-
-        const float shadowValue = shootShadowRays(light, hit.position, hit.normal, rng);
-
-        finalColor += (diffuse + specular) * shadowValue * (1.0f - mat.reflection);
-    }
-
-    // Reflection is a property of the surface, not of any one light, so it is traced
-    // once per hit rather than once per light in the loop above.
-    if (mat.reflection > 0)
-    {
-        Ray reflectedRay = hit.ray.getReflectionRay(hit.position, hit.normal);
-        Hit reflectionHit = shootRay(reflectedRay);
-
-        if (reflectionHit.isHit)
-        {
-            Vec3 reflectionColor = getHitColor(reflectionHit, recurseLevel + 1, rng);
-            finalColor += reflectionColor * mat.reflection;
-        }
-    }
-
-    return finalColor;
-}
-
-auto RayTracer::shootShadowRays(const std::shared_ptr<Light> &light, Vec3 pos, Vec3 normal, Rng &rng) -> float
-{
-    const Vec3 lightCenterPos = light->getPos();
-    const Vec3 toLight = lightCenterPos - pos;
-
-    // Build a basis spanning the light's disc, perpendicular to the direction towards it.
-    // Crossing with a fixed axis is degenerate when the light lies along that axis, which
-    // produced a zero-length vector and then NaN sample positions, so pick a reference
-    // axis that cannot be parallel to the light direction.
-    const Vec3 lightDirN = toLight.normalized();
-    const Vec3 reference = (std::fabs(lightDirN.y) > 0.9f) ? Vec3(1.0f, 0.0f, 0.0f) : Vec3(0.0f, 1.0f, 0.0f);
-
-    const Vec3 u = lightDirN.cross(reference).normalized();
-    const Vec3 v = lightDirN.cross(u).normalized();
-
-    // Start shadow rays just off the surface so they cannot immediately re-hit it.
-    const Vec3 origin = Ray::offsetOrigin(pos, normal);
-
-    unsigned int litSources = 0;
-
-    for (unsigned int i = 0; i < m_NumShadowRays; i++)
-    {
-        // Sample the light's disc uniformly by area. Sampling a square, as this did
-        // before, gives a square light and biases samples towards the corners.
-        const float radius = light->getRadius() * std::sqrt(rng.nextFloat());
-        const float angle = rng.nextFloat() * 2.0f * static_cast<float>(M_PI);
-
-        const Vec3 lightPos = lightCenterPos + (u * (radius * std::cos(angle))) + (v * (radius * std::sin(angle)));
-
-        const Vec3 shadowDir = lightPos - origin;
-        const float lightDist = shadowDir.length();
-
-        // Bound the ray at the light: anything beyond it cannot cast a shadow, and this
-        // turns a closest-hit search into an occlusion test.
-        Ray shadowRay(origin, shadowDir, Ray::defaultEpsilon, lightDist - Ray::defaultEpsilon);
-
-        // An occlusion query, not a closest-hit search: a shadow ray only needs to know
-        // whether anything is in the way, so traversal can stop at the first hit.
-        Stats::countRay();
-        if (!m_Scene->getAccelerationStructure()->isOccluded(shadowRay))
-        {
-            litSources++;
-        }
-    }
-
-    return static_cast<float>(litSources) / static_cast<float>(m_NumShadowRays);
 }

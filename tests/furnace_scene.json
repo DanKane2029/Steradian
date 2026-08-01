@@ -1,0 +1,11 @@
+{
+  "ambientLighting": [1.0, 1.0, 1.0],
+  "camera": { "org": [0, 0, 3.0], "lookAt": [0, 0, 0], "fov": 45 },
+  "materials": {
+    "perfect": { "type": "diffuse", "albedo": [1.0, 1.0, 1.0] }
+  },
+  "objects": [
+    { "type": "sphere", "material": "perfect", "center": [0, 0, 0], "radius": 1.0 }
+  ],
+  "lights": []
+}

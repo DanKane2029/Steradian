@@ -1,5 +1,5 @@
 #pragma once
-#include <string>
+#include <cstdint>
 #include <vector>
 
 #include "RayTracer/Hit.h"
@@ -17,7 +17,21 @@ class SceneObject
     virtual Hit rayIntersect(Ray ray) = 0;
     virtual Vec3 getCenterPoint() = 0;
 
-    void setMaterialName(std::string &name);
+    void setMaterialIndex(uint32_t index)
+    {
+        m_MaterialIndex = index;
+    }
+
+    auto getMaterialIndex() const -> uint32_t
+    {
+        return m_MaterialIndex;
+    }
+
+    /** marks this primitive as a light that direct lighting samples explicitly */
+    void setEmitterIndex(int32_t index)
+    {
+        m_EmitterIndex = index;
+    }
 
     float getMinX()
     {
@@ -45,7 +59,8 @@ class SceneObject
     }
 
   protected:
-    std::string m_MaterialName;
+    uint32_t m_MaterialIndex = 0;
+    int32_t m_EmitterIndex = -1;
     float minX, minY, minZ;
     float maxX, maxY, maxZ;
 };

@@ -11,6 +11,15 @@ target_link_libraries(image_compare PRIVATE pt_core pt_warnings)
 # Checks the acceleration structure against a brute force scan. Golden images prove the
 # final picture is unchanged; this proves the structure itself returns exactly the hits a
 # linear search would, which is the property the previous octree quietly violated.
+# White furnace test: a fully reflective surface in a uniform environment must render as
+# exactly that environment. Almost any error in the path loop -- a dropped cosine, a
+# density applied the wrong way round, a bounce that loses throughput -- shows up here.
+add_executable(furnace furnace.cpp)
+target_link_libraries(furnace PRIVATE pt_core pt_warnings)
+
+add_test(NAME furnace COMMAND furnace ${CMAKE_CURRENT_SOURCE_DIR}/furnace_scene.json 20000)
+set_tests_properties(furnace PROPERTIES TIMEOUT 300)
+
 add_executable(bvh_consistency bvh_consistency.cpp)
 target_link_libraries(bvh_consistency PRIVATE pt_core pt_warnings)
 
@@ -37,9 +46,10 @@ set(GOLDEN_SCENES
     # 48,918 triangles. Only affordable as a test since the BVH started culling: this
     # scene took over a minute per render before, and now takes a fraction of a second.
     test_man_obj
+    cornell_box
 )
 
-set(GOLDEN_SAMPLES 4)
+set(GOLDEN_SAMPLES 64)
 set(GOLDEN_SEED 1)
 
 foreach(scene ${GOLDEN_SCENES})
