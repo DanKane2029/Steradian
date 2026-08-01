@@ -16,6 +16,27 @@ Requires **CMake 3.22 or newer** and a **C++20** compiler.
 ```sh
 git clone --recurse-submodules https://github.com/DanKane2029/Steradian.git
 cd Steradian
+scripts/build.sh --test
+```
+
+`scripts/build.sh` configures, builds, and optionally runs the tests. It fetches any
+missing submodules and, if the viewer's dependencies were installed without root, points
+CMake at them so those arguments do not have to be remembered.
+
+| | |
+| --- | --- |
+| `scripts/build.sh` | configure and build |
+| `scripts/build.sh --test` | ...and run the test suite |
+| `scripts/build.sh --clean --test` | ...from scratch |
+| `scripts/build.sh --debug` | a debug build |
+| `scripts/build.sh --no-viewer` | headless only |
+
+Each configuration builds into its own directory, so switching between release and debug
+does not force a rebuild each time.
+
+Or drive CMake directly:
+
+```sh
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 ```
