@@ -8,6 +8,7 @@
 #include "Window/PixelBuffer.h"
 
 #ifdef PT_HAVE_VIEWER
+#include "Window/CameraController.h"
 #include "Window/Window.h"
 #endif
 
@@ -17,6 +18,7 @@
 #include <cstdlib>
 #include <exception>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -266,7 +268,7 @@ auto main(int argc, char *argv[]) -> int
         }
 
 #ifdef PT_HAVE_VIEWER
-        Window window("Path Tracer", config.windowWidth, config.windowHeight);
+        Window window("Steradian", config.windowWidth, config.windowHeight);
 
         // framebuffer size sometimes differs from window size
         auto fbSize = window.getFrameBufferSize();
@@ -279,48 +281,96 @@ auto main(int argc, char *argv[]) -> int
         RayTracer rayTracer(&pixelBuffer, &scene, config);
         window.setRayTracer(&rayTracer);
 
-        std::vector<std::thread> threads;
-        threads.reserve(numThreads);
+        ThreadPool pool(numThreads);
+
+        const Camera initialCamera = scene.getCamera();
+        Camera camera = initialCamera;
+        CameraController controller(camera);
+
+        std::cout << "Viewer controls:\n"
+                  << "  W A S D      move, Q E down/up, hold Shift to move faster\n"
+                  << "  left drag    look around\n"
+                  << "  [ ]          decrease / increase movement speed\n"
+                  << "  R            return to the scene's camera\n"
+                  << "  Esc          quit" << std::endl;
+
+        // Accumulated samples per pixel. The image is refined progressively: each frame
+        // adds one more sample everywhere and the buffer keeps the running average, so
+        // the picture converges the longer the camera is left alone.
+        unsigned int accumulated = 0;
+
+        double lastFrameTime = glfwGetTime();
+        double lastTitleUpdate = lastFrameTime;
 
         while (!window.shouldClose())
         {
-            auto curSize = window.getFrameBufferSize();
+            const double now = glfwGetTime();
+            const auto deltaTime = static_cast<float>(now - lastFrameTime);
+            lastFrameTime = now;
+
+            bool restart = window.consumeResized();
+
+            if (window.resetRequested())
+            {
+                camera = initialCamera;
+                controller = CameraController(camera);
+                restart = true;
+            }
+
+            if (controller.update(window.getContext(), camera, deltaTime))
+            {
+                restart = true;
+            }
+
+            scene.setCamera(camera);
+
+            // Samples average light arriving at one viewpoint, so they are only valid for
+            // the camera that took them. Moving invalidates every one of them at once.
+            if (restart)
+            {
+                pixelBuffer.clearBuffer();
+                accumulated = 0;
+            }
+
+            const auto curSize = window.getFrameBufferSize();
 
             if (curSize.first > 0 && curSize.second > 0)
             {
-                for (unsigned int i = 0; i < numThreads; i++)
-                {
-                    threads.emplace_back([&rayTracer, &config]() {
-                        // Each worker owns its generator; a shared engine here was a
-                        // data race.
-                        static thread_local Rng rng(0x243f6a8885a308d3ULL, reinterpret_cast<uintptr_t>(&rng));
+                const int height = curSize.second;
 
-                        double curTime = glfwGetTime();
-                        const double endingTime = curTime + (1.0 / static_cast<double>(config.fps));
+                constexpr int rowsPerBand = 8;
+                const auto bandCount = static_cast<uint32_t>((height + rowsPerBand - 1) / rowsPerBand);
 
-                        // shoot rays until ready to display next frame
-                        while (curTime < endingTime)
-                        {
-                            rayTracer.sampleScene(rng.nextFloat(), rng.nextFloat());
-                            curTime = glfwGetTime();
-                        }
-                    });
-                }
+                // Vary the seed per pass so each one contributes new samples rather than
+                // repeating the previous pass exactly.
+                const uint64_t passSeed = options.seed + (static_cast<uint64_t>(accumulated) * 0x9e3779b97f4a7c15ULL);
+
+                pool.parallelFor(bandCount, [&](uint32_t band) {
+                    const int yStart = static_cast<int>(band) * rowsPerBand;
+                    const int yEnd = std::min(yStart + rowsPerBand, height);
+
+                    rayTracer.renderRows(yStart, yEnd, 1, passSeed);
+                });
+
+                accumulated++;
             }
-
-            for (std::thread &t : threads)
-            {
-                if (t.joinable())
-                {
-                    t.join();
-                }
-            }
-
-            // Threads are joined and finished; drop them so the vector does not grow
-            // without bound for the lifetime of the program.
-            threads.clear();
 
             window.update();
+
+            // Retitling on every frame is a synchronous call into the window system, so
+            // it is limited to a few times a second.
+            if (now - lastTitleUpdate > 0.25)
+            {
+                const double fps = (deltaTime > 0.0f) ? (1.0 / deltaTime) : 0.0;
+
+                std::ostringstream title;
+                title.precision(1);
+                title << std::fixed << "Steradian - " << accumulated << " spp - " << fps << " fps - speed "
+                      << controller.getSpeed();
+
+                window.setTitle(title.str());
+                lastTitleUpdate = now;
+            }
         }
 
         return EXIT_SUCCESS;

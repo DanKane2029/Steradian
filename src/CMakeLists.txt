@@ -35,7 +35,10 @@ add_executable(steradian main.cpp)
 target_link_libraries(steradian PRIVATE pt_core pt_warnings)
 
 if(PT_VIEWER_ENABLED)
-    add_library(pt_viewer STATIC Window/Window.cpp)
+    add_library(pt_viewer STATIC
+        Window/CameraController.cpp
+        Window/Window.cpp
+    )
     target_link_libraries(pt_viewer
         PUBLIC pt_core glfw OpenGL::GL
         PRIVATE pt_warnings

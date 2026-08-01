@@ -107,6 +107,12 @@ class Scene
         return m_Camera;
     }
 
+    /** replaces the camera, for interactive navigation */
+    void inline setCamera(const Camera &camera)
+    {
+        m_Camera = camera;
+    }
+
     /**
      * builds the acceleration structure over the scene's objects
      *

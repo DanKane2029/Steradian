@@ -18,6 +18,7 @@ out of the method itself rather than being approximated.
 | 2 | Correctness pass: camera basis and real FOV, ray epsilons, OBJ triangulation, textures | done |
 | 3 | Performance: flat SAH BVH that actually culls, occlusion queries, thread pool | done |
 | 4 | Monte Carlo path tracing: hemisphere sampling, BSDFs, area lights, tone mapping | done |
+| 5 | Interactive viewer: progressive accumulation, camera controls, tone mapped display | done |
 
 ### How it works
 
@@ -114,7 +115,7 @@ cmake -B build -DPT_BUILD_VIEWER=OFF
 ```sh
 # interactive viewer
 ./build/src/steradian --config res/configs/test_config.json \
-                        --scene  res/scenes/two_spheres.json
+                        --scene  res/scenes/cornell_box.json
 
 # headless render to a PNG
 ./build/src/steradian --config res/configs/test_config.json \
@@ -139,6 +140,27 @@ testing possible.
 
 Asset paths inside a scene file are resolved relative to that scene file, so scenes and
 models can be moved or checked out anywhere.
+
+### Viewer
+
+The window refines its image progressively: every frame adds one more sample per pixel
+and the buffer holds the running average, so leaving the camera still lets the picture
+converge. Moving discards the accumulation, because those samples describe light arriving
+at a viewpoint that no longer exists.
+
+| Input | Action |
+| --- | --- |
+| `W` `A` `S` `D` | Move forward, left, back, right |
+| `Q` `E` | Move down, up |
+| Hold `Shift` | Move four times faster |
+| Left-drag | Look around |
+| `[` `]` | Decrease / increase movement speed |
+| `R` | Return to the camera the scene file specified |
+| `Esc` | Quit |
+
+The title bar shows accumulated samples per pixel, frame rate and movement speed. The
+viewer applies the same ACES tone mapping and sRGB encoding as the file writer, so what
+is on screen matches what `--out` produces.
 
 ### Scene camera
 

@@ -1,9 +1,7 @@
 {
-	"windowHeight": 800,
-	"windowWidth": 1000,
-	"fps": 30,
-	"numThreads": 8,
-	"numChildrenInBVHLeafNodes": 25,
-	"numShadowRays": 50,
-	"maxRecurseLevel": 10
+  "windowHeight": 800,
+  "windowWidth": 1000,
+  "numThreads": 8,
+  "numChildrenInBVHLeafNodes": 25,
+  "maxRecurseLevel": 10
 }
