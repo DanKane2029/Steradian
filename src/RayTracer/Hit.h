@@ -59,6 +59,16 @@ struct Hit
     int32_t emitterIndex = -1;
 
     /**
+     * \brief True when the ray struck the outside of the surface.
+     *
+     * The normal is always flipped to face the ray, so it cannot be used to work out
+     * which side was hit. Refraction needs to know: a ray entering glass and a ray
+     * leaving it must use reciprocal indices, and the difference is invisible in the
+     * normal once it has been flipped.
+     */
+    bool frontFace = true;
+
+    /**
      * \brief The texture coordinate at the hit position.
      *
      * Interpolated from the primitive's vertex texture coordinates. Only x and y are

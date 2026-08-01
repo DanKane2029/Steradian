@@ -226,8 +226,12 @@ auto Triangle::rayIntersect(Ray ray) -> Hit
         hit.normal = interpolateNormal(u, v);
         hit.textureCoord = interpolateTextureCoord(u, v);
 
+        // Record which side was struck before the normal is flipped, since flipping
+        // destroys that information and refraction depends on it.
+        hit.frontFace = hit.normal.dot(ray.dir) < 0.0f;
+
         // Present the surface facing the ray, so back faces shade like front faces.
-        if (hit.normal.dot(ray.dir) > 0.0f)
+        if (!hit.frontFace)
         {
             hit.normal = -hit.normal;
         }
@@ -344,8 +348,11 @@ auto Sphere::rayIntersect(Ray ray) -> Hit
     hit.normal = getNormal(hit.position);
     hit.textureCoord = getTextureCoords(hit.position);
 
+    // Record which side was struck before flipping, as above.
+    hit.frontFace = hit.normal.dot(ray.dir) < 0.0f;
+
     // Present the surface facing the ray so a ray inside the sphere shades sensibly.
-    if (hit.normal.dot(ray.dir) > 0.0f)
+    if (!hit.frontFace)
     {
         hit.normal = -hit.normal;
     }

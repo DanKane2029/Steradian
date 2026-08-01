@@ -382,21 +382,34 @@ auto Integrator::radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) c
         }
 
         case Material::Type::Dielectric: {
-            // hit.normal always faces the ray, so the sign of the dot product with the
-            // geometric orientation tells us which side we are entering.
-            const bool entering = ray.dir.dot(hit.normal) < 0.0f;
-            const float eta = entering ? (1.0f / material.ior) : material.ior;
+            // Which side of the surface the ray struck decides the ratio of indices.
+            //
+            // This previously asked whether the ray pointed against the normal, which is
+            // always true: the normal is flipped to face the ray before shading. Every
+            // interaction was therefore treated as entering the glass, so rays inside it
+            // bent the wrong way trying to leave, never escaped, and a glass sphere
+            // rendered as a solid ball.
+            const float eta = hit.frontFace ? (1.0f / material.ior) : material.ior;
 
-            const float cosTheta = std::min(-ray.dir.dot(hit.normal), 1.0f);
-
-            const float r0raw = (1.0f - material.ior) / (1.0f + material.ior);
-            const float reflectance = Sampling::fresnelSchlick(cosTheta, r0raw * r0raw);
+            const float cosIncident = std::min(-ray.dir.dot(hit.normal), 1.0f);
 
             Vec3 refracted;
             const bool canRefract = Sampling::refract(ray.dir, hit.normal, eta, refracted);
 
+            // Schlick's approximation is stated from the less dense side, so a ray on its
+            // way out of the glass has to be evaluated with the angle it will leave at
+            // rather than the shallower one it arrived with. Using the wrong one
+            // understates reflection at grazing angles, which is where a glass surface
+            // becomes most mirror-like.
+            const float cosForFresnel =
+                (canRefract && !hit.frontFace) ? std::fabs(refracted.dot(hit.normal)) : cosIncident;
+
+            const float r0raw = (1.0f - material.ior) / (1.0f + material.ior);
+            const float reflectance = Sampling::fresnelSchlick(cosForFresnel, r0raw * r0raw);
+
             // Choose reflection or refraction in proportion to Fresnel. Picking one
             // stochastically keeps the path count from doubling at every glass surface.
+            // Total internal reflection leaves no choice to make.
             if (!canRefract || rng.nextFloat() < reflectance)
             {
                 nextDirection = Sampling::reflect(ray.dir, hit.normal);
