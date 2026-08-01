@@ -41,8 +41,10 @@ class Window
         int m_Width = 0, m_Height = 0;
         int m_FBWidth = 0, m_FBHeight = 0;
         bool m_Closed = false;
-        PixelBuffer *m_PixelBuffer;
-        RayTracer *m_RayTracer;
+        // Initialized: the framebuffer-size callback dereferences these, and GLFW can
+        // fire it during window creation, before they have been set.
+        PixelBuffer *m_PixelBuffer = nullptr;
+        RayTracer *m_RayTracer = nullptr;
     };
 
     WindowData m_Data;

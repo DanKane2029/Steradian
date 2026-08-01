@@ -108,7 +108,15 @@ auto Window::getFrameBufferSize() -> std::pair<int, int>
  */
 void Window::update()
 {
-    glDrawPixels(m_Data.m_Width, m_Data.m_Height, GL_RGB, GL_FLOAT, m_Data.m_PixelBuffer->getPixels());
+    if (m_Data.m_PixelBuffer != nullptr)
+    {
+        // Draw at the pixel buffer's own size. This previously used the window size while
+        // the buffer was allocated at framebuffer size; on a scaled or HiDPI display those
+        // differ and the call read past the end of the buffer.
+        const auto size = m_Data.m_PixelBuffer->getSize();
+        glDrawPixels(size.first, size.second, GL_RGB, GL_FLOAT, m_Data.m_PixelBuffer->getPixels());
+    }
+
     glfwSwapBuffers(m_Window);
     glfwPollEvents();
 }

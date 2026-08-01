@@ -98,7 +98,7 @@ class RayTracer
      * \returns A float value that determines how much the position is in shadow. 0 is completely in shadow and 1 is
      * completly lit.
      */
-    auto shootShadowRays(std::shared_ptr<Light> light, Vec3 pos, Rng &rng) -> float;
+    auto shootShadowRays(const std::shared_ptr<Light> &light, Vec3 pos, Vec3 normal, Rng &rng) -> float;
 
     void updateAspectRatio(float aspectRatio);
 
@@ -127,14 +127,9 @@ class RayTracer
     unsigned int m_ReflectionLimit = 100;
     unsigned int m_MaxRecurseLevel = 10;
 
-    float m_FovX{}, m_FovY{};
-    float m_aspectRatio;
-    Camera m_Camera;
+    float m_aspectRatio{};
 
     Scene *m_Scene{};
     PixelBuffer *m_PixelBuffer{};
     std::mutex m_PixelBufferGuard;
-
-    float vx;
-    float vy;
 };

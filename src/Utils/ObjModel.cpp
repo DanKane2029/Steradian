@@ -49,8 +49,14 @@ auto ObjModel::loadModel(std::string filePath) -> bool
             }
             else if (lineType == VERTEX_TEX)
             {
-                // TODO: texture coordinates are recognized but not yet stored, so meshes
-                // still have no UVs. Parsing them is part of the texturing work.
+                // OBJ stores texture coordinates as "vt u v [w]", so the optional third
+                // component defaults to zero rather than being required.
+                Vec3 texCoord;
+                texCoord.x = std::stof(splitLine[1]);
+                texCoord.y = (splitLine.size() > 2) ? std::stof(splitLine[2]) : 0.0f;
+                texCoord.z = 0.0f;
+
+                m_textureCoordList.push_back(texCoord);
             }
             else if (lineType == VERTEX_NORM)
             {
@@ -158,24 +164,53 @@ auto ObjModel::parseFace(std::vector<std::string> &faceIndices) -> std::vector<O
 
 auto ObjModel::createTriangleFromFaceIndices(FaceIndices fi0, FaceIndices fi1, FaceIndices fi2) -> Triangle
 {
-    bool positionsSet = fi0.positionSet && fi0.positionSet && fi2.positionSet;
-    bool normalsSet = fi0.normalSet && fi0.normalSet && fi2.normalSet;
-    bool textureSet = fi0.textureSet && fi0.textureSet && fi2.textureSet;
+    // fi1 is included in each of these. It was previously omitted (fi0 was tested twice),
+    // so a face with a missing middle index passed validation and then indexed the vertex
+    // list out of bounds.
+    const bool positionsSet = fi0.positionSet && fi1.positionSet && fi2.positionSet;
+    const bool normalsSet = fi0.normalSet && fi1.normalSet && fi2.normalSet;
+    const bool textureSet = fi0.textureSet && fi1.textureSet && fi2.textureSet;
+
+    if (!positionsSet)
+    {
+        throw std::runtime_error("OBJ face is missing vertex position indices");
+    }
+
+    // OBJ indices are 1-based, and negative values refer back from the end of the list.
+    const auto resolve = [](int index, size_t count) -> size_t {
+        const long long resolved = (index < 0) ? static_cast<long long>(count) + index : index - 1;
+
+        if (resolved < 0 || resolved >= static_cast<long long>(count))
+        {
+            throw std::runtime_error("OBJ index " + std::to_string(index) + " is out of range (list holds " +
+                                     std::to_string(count) + ")");
+        }
+
+        return static_cast<size_t>(resolved);
+    };
+
+    const size_t p0 = resolve(fi0.position, m_vertexList.size());
+    const size_t p1 = resolve(fi1.position, m_vertexList.size());
+    const size_t p2 = resolve(fi2.position, m_vertexList.size());
 
     Triangle tri;
 
-    if (positionsSet && normalsSet)
+    if (normalsSet)
     {
-        tri = Triangle(m_vertexList[fi0.position - 1], m_normalList[fi0.normal - 1], m_vertexList[fi1.position - 1],
-                       m_normalList[fi1.normal - 1], m_vertexList[fi2.position - 1], m_normalList[fi2.normal - 1]);
-    }
-    else if (positionsSet)
-    {
-        tri = Triangle(m_vertexList[fi0.position - 1], m_vertexList[fi1.position - 1], m_vertexList[fi2.position - 1]);
+        tri = Triangle(m_vertexList[p0], m_normalList[resolve(fi0.normal, m_normalList.size())], m_vertexList[p1],
+                       m_normalList[resolve(fi1.normal, m_normalList.size())], m_vertexList[p2],
+                       m_normalList[resolve(fi2.normal, m_normalList.size())]);
     }
     else
     {
-        throw std::runtime_error(std::string("Error creating triangle from obj mesh!"));
+        tri = Triangle(m_vertexList[p0], m_vertexList[p1], m_vertexList[p2]);
+    }
+
+    if (textureSet && !m_textureCoordList.empty())
+    {
+        tri.setTextureCoords(m_textureCoordList[resolve(fi0.texture, m_textureCoordList.size())],
+                             m_textureCoordList[resolve(fi1.texture, m_textureCoordList.size())],
+                             m_textureCoordList[resolve(fi2.texture, m_textureCoordList.size())]);
     }
 
     return tri;
@@ -185,20 +220,19 @@ auto ObjModel::getSceneObjects() -> std::vector<std::shared_ptr<SceneObject>>
 {
     std::vector<std::shared_ptr<SceneObject>> sceneObjectList;
 
-    for (std::vector<ObjModel::FaceIndices> faceIndices : m_faceIndicesList)
+    for (const std::vector<ObjModel::FaceIndices> &faceIndices : m_faceIndicesList)
     {
-        if (faceIndices.size() > 3)
+        // A face needs at least three vertices. Previously anything not larger than three
+        // was assumed to be exactly three and indexed directly, so a malformed two-vertex
+        // face read out of bounds.
+        if (faceIndices.size() < 3)
         {
-            std::vector<Triangle> triList = triangulateFace(faceIndices);
-            for (Triangle tri : triList)
-            {
-                sceneObjectList.push_back(std::make_shared<Triangle>(tri));
-            }
+            std::cerr << "Skipping OBJ face with only " << faceIndices.size() << " vertices" << std::endl;
+            continue;
         }
-        else
-        {
-            Triangle tri = createTriangleFromFaceIndices(faceIndices[0], faceIndices[1], faceIndices[2]);
 
+        for (Triangle &tri : triangulateFace(faceIndices))
+        {
             sceneObjectList.push_back(std::make_shared<Triangle>(tri));
         }
     }
@@ -206,16 +240,22 @@ auto ObjModel::getSceneObjects() -> std::vector<std::shared_ptr<SceneObject>>
     return sceneObjectList;
 }
 
+/**
+ * splits an n-gon into a triangle fan around its first vertex
+ *
+ * An n-gon yields n-2 triangles. The loop bound was previously size-2, which produced
+ * n-3 and so dropped the last triangle of every face: a quad became a single triangle,
+ * leaving half of every quad mesh missing.
+ */
 auto ObjModel::triangulateFace(std::vector<ObjModel::FaceIndices> faceIndices) -> std::vector<Triangle>
 {
-    FaceIndices start = faceIndices[0];
+    const FaceIndices start = faceIndices[0];
     std::vector<Triangle> triList;
+    triList.reserve(faceIndices.size() - 2);
 
-    for (unsigned int i = 1; i < faceIndices.size() - 2; i++)
+    for (size_t i = 1; i + 1 < faceIndices.size(); i++)
     {
-        Triangle tri = createTriangleFromFaceIndices(start, faceIndices[i], faceIndices[i + 1]);
-
-        triList.emplace_back(tri);
+        triList.emplace_back(createTriangleFromFaceIndices(start, faceIndices[i], faceIndices[i + 1]));
     }
 
     return triList;

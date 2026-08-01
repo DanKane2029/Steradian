@@ -90,30 +90,72 @@ Vec3 Triangle::getNormal(Vec3 position)
 {
     if (!hasNormalVertices)
     {
-        Vec3 v1 = point1 - point0;
-        Vec3 v2 = point2 - point0;
-
-        Vec3 normal = v1.cross(v2);
-        normal.normalize();
-
-        return normal;
+        return faceNormal();
     }
-    else
+
+    // Recover barycentrics from areas. This is only needed for callers that have a
+    // position but no barycentrics; the intersection path uses interpolateNormal
+    // directly with the coordinates Moller-Trumbore already computed.
+    const float areaTotal = triangleArea(point0, point1, point2);
+    if (areaTotal <= 0.0f)
     {
-        float areaTotal = triangleArea(point0, point1, point2);
-        float area0 = triangleArea(position, point1, point2);
-        float area1 = triangleArea(position, point2, point0);
-        float area2 = triangleArea(position, point0, point1);
-
-        float weight0 = area0 / areaTotal;
-        float weight1 = area1 / areaTotal;
-        float weight2 = area2 / areaTotal;
-
-        Vec3 interpolatedNormal = (normal0 * weight0) + (normal1 * weight1) + (normal2 * weight2);
-        interpolatedNormal.normalize();
-
-        return interpolatedNormal;
+        return faceNormal();
     }
+
+    const float u = triangleArea(position, point2, point0) / areaTotal;
+    const float v = triangleArea(position, point0, point1) / areaTotal;
+
+    return interpolateNormal(u, v);
+}
+
+/**
+ * the geometric normal of the triangle's plane
+ */
+auto Triangle::faceNormal() const -> Vec3
+{
+    const Vec3 v1 = point1 - point0;
+    const Vec3 v2 = point2 - point0;
+
+    return v1.cross(v2).normalized();
+}
+
+/**
+ * interpolates the vertex normals using barycentric coordinates
+ *
+ * \param u The barycentric weight of point1, as produced by the intersection test.
+ * \param v The barycentric weight of point2.
+ */
+auto Triangle::interpolateNormal(float u, float v) const -> Vec3
+{
+    if (!hasNormalVertices)
+    {
+        return faceNormal();
+    }
+
+    const float w = 1.0f - u - v;
+    const Vec3 interpolated = (normal0 * w) + (normal1 * u) + (normal2 * v);
+
+    // Degenerate vertex normals (all zero, or cancelling out) would normalize to NaN.
+    if (interpolated.lengthSquared() <= 0.0f)
+    {
+        return faceNormal();
+    }
+
+    return interpolated.normalized();
+}
+
+/**
+ * interpolates the vertex texture coordinates using barycentric coordinates
+ */
+auto Triangle::interpolateTextureCoord(float u, float v) const -> Vec3
+{
+    if (!hasTextureCoords)
+    {
+        return {};
+    }
+
+    const float w = 1.0f - u - v;
+    return (texCoord0 * w) + (texCoord1 * u) + (texCoord2 * v);
 }
 
 /**
@@ -176,13 +218,23 @@ auto Triangle::rayIntersect(Ray ray) -> Hit
 
     float t = e2.dot(q) * invDet;
 
-    if (t > 0.0)
+    if (ray.isValidHit(t))
     {
         hit.isHit = true;
         hit.materialName = m_MaterialName;
         hit.time = t;
         hit.position = ray.posAt(t);
-        hit.normal = getNormal(hit.position);
+
+        // Moller-Trumbore already produced the barycentric coordinates, so interpolated
+        // normals and texture coordinates come for free rather than being recomputed.
+        hit.normal = interpolateNormal(u, v);
+        hit.textureCoord = interpolateTextureCoord(u, v);
+
+        // Present the surface facing the ray, so back faces shade like front faces.
+        if (hit.normal.dot(ray.dir) > 0.0f)
+        {
+            hit.normal = -hit.normal;
+        }
 
         return hit;
     }
@@ -198,6 +250,17 @@ auto Triangle::rayIntersect(Ray ray) -> Hit
 auto Triangle::getCenterPoint() -> Vec3
 {
     return (point0 + point1 + point2) / 3.0f;
+}
+
+/**
+ * attaches per-vertex texture coordinates loaded from a model file
+ */
+void Triangle::setTextureCoords(Vec3 t0, Vec3 t1, Vec3 t2)
+{
+    texCoord0 = t0;
+    texCoord1 = t1;
+    texCoord2 = t2;
+    hasTextureCoords = true;
 }
 
 auto Triangle::getPoints() -> std::vector<Vec3>
@@ -249,36 +312,29 @@ auto Sphere::rayIntersect(Ray ray) -> Hit
 {
     Hit hit;
 
-    Vec3 l = m_Center - ray.org;
+    const Vec3 l = m_Center - ray.org;
 
-    float tca = l.dot(ray.dir);
-    if (tca < 0.0f)
-    {
-        return hit;
-    }
+    const float tca = l.dot(ray.dir);
 
-    float d2 = l.dot(l) - tca * tca;
-    float radius2 = m_Radius * m_Radius;
+    // Note: no early rejection on tca < 0 here. That would discard rays whose origin is
+    // inside the sphere, which still have a valid forward intersection, and would block
+    // refraction later.
+    const float d2 = l.dot(l) - (tca * tca);
+    const float radius2 = m_Radius * m_Radius;
     if (d2 > radius2)
     {
         return hit;
     }
 
-    float thc = sqrtf(radius2 - d2);
+    const float thc = sqrtf(radius2 - d2);
 
-    float t0 = tca - thc;
-    float t1 = tca + thc;
-
-    if (t0 > t1)
+    // Take the nearest intersection inside the ray's valid interval; if the near root is
+    // behind tMin (the ray starts inside, or just off the surface), try the far one.
+    float t = tca - thc;
+    if (!ray.isValidHit(t))
     {
-        std::swap(t0, t1);
-    }
-
-    if (t0 < 0.0f)
-    {
-        t0 = t1;
-        // t0 and t1 are both negative
-        if (t0 < 0.0f)
+        t = tca + thc;
+        if (!ray.isValidHit(t))
         {
             return hit;
         }
@@ -286,11 +342,31 @@ auto Sphere::rayIntersect(Ray ray) -> Hit
 
     hit.isHit = true;
     hit.materialName = m_MaterialName;
-    hit.time = t0;
-    hit.position = ray.posAt(t0);
+    hit.time = t;
+    hit.position = ray.posAt(t);
     hit.normal = getNormal(hit.position);
+    hit.textureCoord = getTextureCoords(hit.position);
+
+    // Present the surface facing the ray so a ray inside the sphere shades sensibly.
+    if (hit.normal.dot(ray.dir) > 0.0f)
+    {
+        hit.normal = -hit.normal;
+    }
 
     return hit;
+}
+
+/**
+ * maps a point on the sphere to spherical texture coordinates in [0, 1]
+ */
+auto Sphere::getTextureCoords(Vec3 pointOnSurface) const -> Vec3
+{
+    const Vec3 n = (pointOnSurface - m_Center).normalized();
+
+    const float u = (atan2f(n.x, n.z) / (2.0f * static_cast<float>(M_PI))) + 0.5f;
+    const float v = (n.y * 0.5f) + 0.5f;
+
+    return {u, v, 0.0f};
 }
 
 /**

@@ -3,6 +3,7 @@
 #include "RayTracer/Ray.h"
 #include "SceneObject.h"
 
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -35,17 +36,27 @@ struct BoundingBox
         this->maxZ = maxZ;
     }
 
-    BoundingBox(std::vector<std::shared_ptr<SceneObject>> objectList)
+    /**
+     * builds the bounding box enclosing a list of scene objects
+     *
+     * The accumulators start at the extreme opposite ends so the first object sets real
+     * bounds. Previously they were left uninitialized and the maxima were accumulated
+     * with std::min, so the resulting box was meaningless.
+     */
+    BoundingBox(const std::vector<std::shared_ptr<SceneObject>> &objectList)
     {
-        for (std::shared_ptr<SceneObject> object : objectList)
-        {
-            this->minX = std::min(minX, object->getMinX());
-            this->minY = std::min(minY, object->getMinY());
-            this->minZ = std::min(minZ, object->getMinZ());
+        minX = minY = minZ = std::numeric_limits<float>::max();
+        maxX = maxY = maxZ = std::numeric_limits<float>::lowest();
 
-            this->maxX = std::min(maxX, object->getMaxX());
-            this->maxY = std::min(maxY, object->getMaxY());
-            this->maxZ = std::min(maxZ, object->getMaxZ());
+        for (const std::shared_ptr<SceneObject> &object : objectList)
+        {
+            minX = std::min(minX, object->getMinX());
+            minY = std::min(minY, object->getMinY());
+            minZ = std::min(minZ, object->getMinZ());
+
+            maxX = std::max(maxX, object->getMaxX());
+            maxY = std::max(maxY, object->getMaxY());
+            maxZ = std::max(maxZ, object->getMaxZ());
         }
     }
 

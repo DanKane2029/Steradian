@@ -49,12 +49,12 @@ struct Hit
     std::string materialName;
 
     /**
-     * \brief The color of the hit calculated by the ray tracer.
+     * \brief The texture coordinate at the hit position.
      *
-     * A Vector3 used to describe the color of the scene object at the hit position from the view of the camera. This
-     * value is calculated by the ray tracer and stored here to be added to the pixel buffer.
+     * Interpolated from the primitive's vertex texture coordinates. Only x and y are
+     * meaningful; z is unused and left at zero.
      */
-    Vec3 color{};
+    Vec3 textureCoord{};
 
     /**
      * \brief The ray that created the hit.

@@ -123,7 +123,9 @@ auto BVH::filterObjects(std::shared_ptr<BVHNode> node, std::vector<std::shared_p
  */
 auto BVH::encapsulateObjects(std::vector<std::shared_ptr<SceneObject>> objectList) -> BoundingBox
 {
-    const float floatMin = std::numeric_limits<float>::min();
+    // lowest(), not min(): min() is the smallest positive normal, so seeding the maxima
+    // with it produced boxes that were wrong for geometry in negative coordinates.
+    const float floatMin = std::numeric_limits<float>::lowest();
     const float floatMax = std::numeric_limits<float>::max();
 
     float minX = floatMax;

@@ -43,11 +43,11 @@ class Scene
     Camera m_Camera;
 
   public:
-    std::vector<std::shared_ptr<SceneObject>> getObjectList();
+    auto getObjectList() -> const std::vector<std::shared_ptr<SceneObject>> &;
     void addObject(std::shared_ptr<SceneObject> sceneObject, std::string materialName);
     void addObjects(std::vector<std::shared_ptr<SceneObject>> sceneObjectList, std::string materialName);
 
-    std::vector<std::shared_ptr<Light>> getLightList();
+    auto getLightList() -> const std::vector<std::shared_ptr<Light>> &;
     void addLight(std::shared_ptr<Light> light);
 
     void registerMaterial(Material material);
@@ -65,12 +65,20 @@ class Scene
         m_AmbientLighting = al;
     };
 
-    Camera inline getCamera()
+    // Returned by reference: this is read once per light per shade, and copying the
+    // camera (and, before, the whole light vector) on every call was pure overhead.
+    auto inline getCamera() const -> const Camera &
     {
         return m_Camera;
     }
 
-    void createAcceleratedStructure();
+    /**
+     * builds the acceleration structure over the scene's objects
+     *
+     * \param objectsInLeaf Maximum primitives per leaf node. Comes from the config,
+     *        which previously parsed the value and then discarded it.
+     */
+    void createAcceleratedStructure(unsigned int objectsInLeaf = 10);
     std::shared_ptr<BVH> getAccelerationStructure()
     {
         return m_AcceleratedStructure;

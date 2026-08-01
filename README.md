@@ -16,7 +16,7 @@ above a surface is the thing the renderer is being built to do.
 | --- | --- | --- |
 | 0 | Build and run reproducibly; headless PNG output; deterministic seeding | done |
 | 1 | Golden-image regression tests, CI, BVH/ray instrumentation | done |
-| 2 | Correctness pass: camera basis and real FOV, ray epsilons, OBJ triangulation, textures | planned |
+| 2 | Correctness pass: camera basis and real FOV, ray epsilons, OBJ triangulation, textures | done |
 | 3 | Performance: flat SAH BVH that actually culls, typed primitive arrays, slim hit record, thread pool | planned |
 | 4 | Replace the integrator with Monte Carlo path tracing: hemisphere sampling, BSDFs, area lights, tonemapping | planned |
 
@@ -25,16 +25,15 @@ above a surface is the thing the renderer is being built to do.
 These are real and measured, not speculative:
 
 - **The acceleration structure performs no culling.** Traversal descends into every node and
-  tests every primitive; the bounding-box test exists but is never called. Render time scales
-  *linearly* with primitive count — 960 triangles takes 0.27 s where 24,459 takes 6.23 s at
-  the same settings.
-- **The OBJ loader drops geometry.** Fan triangulation is off by one, so every n-gon loses its
-  last triangle. `man.obj` is entirely quads and loads as 24,459 triangles where 48,918 is
-  correct — half the mesh is missing.
-- **The camera ignores its own orientation.** Film offsets are applied in world XY, and the
-  field of view is derived from the pixel count rather than the scene, so it only behaves
-  looking along ±Z and aspect ratio is applied twice.
-- **Secondary rays have no epsilon**, producing visible shadow acne.
+  tests every primitive; the bounding-box test exists but is never called. Worse, primitives
+  are duplicated across children, so `ball.obj` — 960 triangles — costs **1236 primitive tests
+  per ray**, more work than simply testing every triangle in the scene. Replacing this is
+  Stage 3, and it is the largest single win available.
+- **Shading is Blinn-Phong, not a BSDF.** No energy conservation, no importance sampling, and
+  ambient light is added as a flat constant rather than being derived from the scene.
+- **The `transparency` and `refraction` material fields are parsed and ignored.** Dielectrics
+  come with the integrator work in Stage 4.
+- **No tone mapping.** Linear radiance is clamped at 1.0 on output, so highlights hard-clip.
 
 ## Building
 
@@ -100,6 +99,7 @@ cmake -B build -DPT_BUILD_VIEWER=OFF
 | --- | --- |
 | `--config <path>` | Config JSON (window size, thread count, shadow rays, recursion depth) |
 | `--scene <path>` | Scene JSON (camera, materials, objects, lights) |
+
 | `--out <path>` | Write a PNG. Implies `--headless` |
 | `--samples <n>` | Samples per pixel for a headless render (default 16) |
 | `--seed <n>` | Base seed (default 1) |
@@ -112,6 +112,21 @@ testing possible.
 
 Asset paths inside a scene file are resolved relative to that scene file, so scenes and
 models can be moved or checked out anywhere.
+
+### Scene camera
+
+```jsonc
+"camera": {
+  "org":    [0, 0, 2.5],   // position
+  "lookAt": [0, 0, 0],     // aim point
+  "fov":    60,            // optional, vertical field of view in degrees (default 60)
+  "up":     [0, 1, 0]      // optional, reference up direction (default +Y)
+}
+```
+
+Lights use inverse-square falloff, so `intensity` scales with the square of the distance
+to the subject: a light 10 units away needs roughly 100× the intensity of one 1 unit away
+to look equally bright.
 
 ### Statistics
 
