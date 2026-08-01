@@ -323,12 +323,14 @@ red leaves the blue green cast of thick window glass.
 
 ### Checkered surfaces
 
+![A glass dragon over a checkered floor](docs/glass_dragon.png)
+
 A checker is the traditional thing to put under a glass object, and for a reason worth
 stating: it is a pattern whose correct appearance is known in advance. Straight lines stay
 straight, squares stay square, and the whole thing runs to a vanishing point. Anything that
 refracts, reflects or magnifies it is measured against that, so errors that a photograph of
-a real object would hide have nowhere to go. Seen through the dragon's body in
-`glass_dragon`, the floor is inverted and bent, but it is still made of squares.
+a real object would hide have nowhere to go. In the image above the floor seen through the
+dragon's body is inverted and bent, but it is still made of squares.
 
 Set `checker` on any material with a second colour and a square size:
 
