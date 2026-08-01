@@ -36,8 +36,9 @@ struct Options
 
     unsigned int samplesPerPixel = 16;
     uint64_t seed = 1;
-    unsigned int numThreads = 0; // 0 means "use the value from the config file"
-    int denoiseIterations = 0;   // 0 disables denoising
+    unsigned int numThreads = 0;    // 0 means "use the value from the config file"
+    int denoiseIterations = 0;      // 0 disables denoising
+    float adaptiveTolerance = 0.0f; // 0 samples every pixel the full number of times
     float denoiseStrength = 0.10f;
 
     bool headless = false;
@@ -64,6 +65,9 @@ void printUsage(const char *program)
               << "  --denoise-strength <v>  How much radiance difference the filter blurs\n"
               << "                     across (default 0.10). Larger removes more noise and\n"
               << "                     more real shading with it\n"
+              << "  --adaptive [t]     Stop sampling a pixel once its estimate has settled,\n"
+              << "                     so effort follows the noise (default tolerance 0.02).\n"
+              << "                     --samples then sets the maximum rather than the count\n"
               << "  --headless         Render once and exit without opening a window.\n"
               << "                     Combine with --out to save the result\n"
               << "  --help             Show this message\n"
@@ -153,6 +157,14 @@ auto parseArgs(int argc, char *argv[]) -> Options
         else if (arg == "--denoise-strength")
         {
             options.denoiseStrength = std::stof(takeValue(argc, argv, i, "--denoise-strength"));
+        }
+        else if (arg == "--adaptive")
+        {
+            options.adaptiveTolerance = 0.02f;
+            if (i + 1 < argc && argv[i + 1][0] != '-')
+            {
+                options.adaptiveTolerance = std::stof(takeValue(argc, argv, i, "--adaptive"));
+            }
         }
         else if (arg == "--threads")
         {
@@ -268,6 +280,7 @@ auto main(int argc, char *argv[]) -> int
             scene.createAcceleratedStructure(config.numChildrenInBVHLeafNodes);
 
             RayTracer rayTracer(&pixelBuffer, &scene, config);
+            rayTracer.setAdaptiveTolerance(options.adaptiveTolerance);
 
             std::cout << "Rendering " << config.windowWidth << "x" << config.windowHeight << " at "
                       << options.samplesPerPixel << " spp on " << numThreads << " thread(s), seed " << options.seed
@@ -285,6 +298,13 @@ auto main(int argc, char *argv[]) -> int
 
             std::cout << "Rendered in " << seconds << " s (" << (samples / seconds / 1e6) << " M primary samples/sec)"
                       << std::endl;
+
+            if (options.adaptiveTolerance > 0.0f)
+            {
+                const auto [used, possible] = rayTracer.lastSampleCount();
+                std::cout << "  samples used     " << used << " of " << possible << " ("
+                          << (100.0 * static_cast<double>(used) / static_cast<double>(possible)) << "%)" << std::endl;
+            }
 
             if (Stats::enabled())
             {
@@ -358,6 +378,7 @@ auto main(int argc, char *argv[]) -> int
         scene.createAcceleratedStructure(config.numChildrenInBVHLeafNodes);
 
         RayTracer rayTracer(&pixelBuffer, &scene, config);
+        rayTracer.setAdaptiveTolerance(options.adaptiveTolerance);
         window.setRayTracer(&rayTracer);
 
         ThreadPool pool(numThreads);

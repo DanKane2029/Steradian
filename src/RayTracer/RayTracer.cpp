@@ -1,5 +1,6 @@
 #include "RayTracer.h"
 
+#include "Utils/Sampling.h"
 #include "Utils/Stats.h"
 
 #include <cmath>
@@ -93,20 +94,51 @@ void RayTracer::renderRows(int yStart, int yEnd, unsigned int samplesPerPixel, u
     }
     const unsigned int stratifiedSamples = strataPerAxis * strataPerAxis;
 
+    // A pixel is never allowed to stop before this many samples. An estimate drawn from
+    // three or four paths can look settled purely by chance, and stopping there leaves a
+    // permanent blotch that no amount of later work removes.
+    constexpr unsigned int minimumSamples = 16;
+
+    // Floor on the brightness a pixel is judged against. Without it, the darker a pixel is
+    // the tighter the absolute accuracy demanded of it, and nearly black regions would
+    // never be allowed to stop at all.
+    constexpr float brightnessFloor = 0.05f;
+
+    uint64_t taken = 0;
+
     for (int iy = yStart; iy < yEnd; iy++)
     {
         // Seeding per row rather than per thread is what makes the output independent of
-        // how the image was divided up between workers.
+        // how the image was divided up between workers. It survives adaptive sampling
+        // because a row is rendered by one thread, left to right, so the sequence is
+        // consumed in the same order however many samples each pixel turns out to need.
         Rng rng(seed, static_cast<uint64_t>(iy));
 
         for (int ix = 0; ix < width; ix++)
         {
+            // Running mean and sum of squared deviations, accumulated the numerically
+            // stable way rather than by keeping a total and a total of squares, which
+            // loses precision once the two are close.
+            float mean = 0.0f;
+            float sumSquaredDeviation = 0.0f;
+            unsigned int n = 0;
+
             for (unsigned int s = 0; s < samplesPerPixel; s++)
             {
                 float jitterX = 0.0f;
                 float jitterY = 0.0f;
 
-                if (s < stratifiedSamples)
+                if (m_AdaptiveTolerance > 0.0f)
+                {
+                    // A progressive sequence, because this pixel may stop at any point and
+                    // whatever it has taken by then must still cover its whole area. The
+                    // grid below cannot be used here: visited in order, its first samples
+                    // all fall in one corner.
+                    const auto scramble = static_cast<uint32_t>((static_cast<uint32_t>(iy) * 73856093u) ^
+                                                                (static_cast<uint32_t>(ix) * 19349663u));
+                    Sampling::haltonSample(s + 1, scramble, jitterX, jitterY);
+                }
+                else if (s < stratifiedSamples)
                 {
                     const unsigned int sx = s % strataPerAxis;
                     const unsigned int sy = s / strataPerAxis;
@@ -126,9 +158,43 @@ void RayTracer::renderRows(int yStart, int yEnd, unsigned int samplesPerPixel, u
                 const Vec3 color = samplePixel(ix, iy, jitterX, jitterY, rng, albedo, normal);
 
                 m_PixelBuffer->setSample(ix, iy, color, albedo, normal);
+
+                n++;
+                taken++;
+
+                if (m_AdaptiveTolerance <= 0.0f)
+                {
+                    continue;
+                }
+
+                const float luminance = (0.2126f * color.x) + (0.7152f * color.y) + (0.0722f * color.z);
+                const float delta = luminance - mean;
+                mean += delta / static_cast<float>(n);
+                sumSquaredDeviation += delta * (luminance - mean);
+
+                if (n < minimumSamples)
+                {
+                    continue;
+                }
+
+                // How uncertain the average of these samples still is. The spread of the
+                // samples divided by their count gives the uncertainty of their mean,
+                // which is the quantity the pixel will actually show.
+                const float variance = sumSquaredDeviation / static_cast<float>(n - 1);
+                const float standardError = std::sqrt(variance / static_cast<float>(n));
+
+                if (standardError <= m_AdaptiveTolerance * std::max(mean, brightnessFloor))
+                {
+                    break;
+                }
             }
         }
     }
+
+    m_SamplesTaken.fetch_add(taken, std::memory_order_relaxed);
+    m_SamplesPossible.fetch_add(static_cast<uint64_t>(yEnd - yStart) * static_cast<uint64_t>(width) *
+                                    static_cast<uint64_t>(samplesPerPixel),
+                                std::memory_order_relaxed);
 
     Stats::mergeThread();
 }
