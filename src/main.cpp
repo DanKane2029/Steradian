@@ -53,11 +53,29 @@ void printUsage(const char *program)
               << "  --seed <n>         Base seed; the same seed and sample count reproduce\n"
               << "                     the same image regardless of thread count (default 1)\n"
               << "  --threads <n>      Worker threads (default: numThreads from the config)\n"
-              << "  --headless         Render once and exit without opening a window\n"
+              << "  --headless         Render once and exit without opening a window.\n"
+              << "                     Combine with --out to save the result\n"
               << "  --help             Show this message\n"
               << "\n"
               << "Passing --out implies --headless. The two positional arguments are kept\n"
-              << "for backwards compatibility and mean <config> <scene>.\n";
+              << "for backwards compatibility and mean <config> <scene>.\n"
+              << "\n"
+              << "Without --out, an interactive viewer opens and refines the image as long\n"
+              << "as the camera is left still. Controls:\n"
+              << "  W A S D            Move forward, left, back, right\n"
+              << "  Q E                Move down, up\n"
+              << "  Shift (held)       Move four times faster\n"
+              << "  Left mouse drag    Look around\n"
+              << "  [ ]                Decrease / increase movement speed\n"
+              << "  R                  Return to the camera the scene file specifies\n"
+              << "  Esc                Quit\n"
+              << "\n"
+              << "Examples:\n"
+              << "  Interactive:  steradian --config res/configs/test_config.json \\\n"
+              << "                          --scene res/scenes/cornell_box.json\n"
+              << "  To a file:    steradian --config res/configs/test_config.json \\\n"
+              << "                          --scene res/scenes/cornell_box.json \\\n"
+              << "                          --out render.png --samples 512\n";
 }
 
 /**
@@ -250,6 +268,17 @@ auto main(int argc, char *argv[]) -> int
                           << " per ray)\n"
                           << "  primitive tests  " << counters.primitiveTests << " (" << perRay(counters.primitiveTests)
                           << " per ray)" << std::endl;
+            }
+
+            if (options.outputPath.empty())
+            {
+                // Rendering with no window and nowhere to write is a valid way to time
+                // the renderer, but it looks identical to the program doing nothing, so
+                // say what happened.
+                std::cout << "Note: no --out was given, so the rendered image was discarded.\n"
+                          << "      Pass --out <file.png> to save it, or drop --headless to "
+                             "open a window."
+                          << std::endl;
             }
 
             if (!options.outputPath.empty())
