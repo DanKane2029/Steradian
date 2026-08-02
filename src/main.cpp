@@ -79,7 +79,8 @@ void printUsage(const char *program)
               << "                     --samples then sets the maximum rather than the count\n"
               << "  --headless         Render once and exit without opening a window.\n"
               << "                     Combine with --out to save the result\n"
-              << "  --device <cpu|gpu> Which backend renders (default cpu). gpu needs a build\n"
+              << "  --device <cpu|gpu> Which backend renders (default cpu), for both a headless\n"
+              << "                     render and the interactive viewer. gpu needs a build\n"
               << "                     configured with -DPT_ENABLE_GPU=ON\n"
               << "  --gpu-info         Report the GPU, OptiX and NVRTC this build can see,\n"
               << "                     then exit. Needs a build configured with\n"
@@ -221,9 +222,9 @@ auto parseArgs(int argc, char *argv[]) -> Options
         options.scenePath = positional[1];
     }
 
-    // Asking for a file implies a headless render, and so does asking for the GPU: the
-    // viewer accumulates through the CPU sampler and has no GPU path yet.
-    if (!options.outputPath.empty() || options.useGpu)
+    // Asking for a file implies a headless render. Asking for the GPU no longer does:
+    // the viewer drives either backend.
+    if (!options.outputPath.empty())
     {
         options.headless = true;
     }
@@ -274,7 +275,7 @@ void renderHeadless(RayTracer &rayTracer, PixelBuffer &pixelBuffer, const Option
  * mapping, denoising, writing the PNG -- is the same code the CPU path uses.
  */
 auto renderOnGpu(const Scene &scene, PixelBuffer &pixelBuffer, const Options &options, const Config &config,
-                 double &setupSeconds) -> bool
+                 double &setupSeconds, double &renderSeconds) -> bool
 {
     // Timed and reported apart from the render, because it is paid once and is not what
     // anyone means by how long a render took: it compiles the device code, builds the
@@ -298,23 +299,26 @@ auto renderOnGpu(const Scene &scene, PixelBuffer &pixelBuffer, const Options &op
     std::vector<Vec3> albedo;
     std::vector<Vec3> normal;
 
-    if (!tracer->render(config.windowWidth, config.windowHeight, options.samplesPerPixel, options.seed,
-                        config.maxRecurseLevel, colour, albedo, normal))
+    const auto renderStart = std::chrono::steady_clock::now();
+    const bool ok = tracer->render(scene.getCamera(), config.windowWidth, config.windowHeight, options.samplesPerPixel,
+                                   options.seed, config.maxRecurseLevel, true, colour, albedo, normal);
+
+    if (!ok)
     {
         std::cerr << "The GPU render failed." << std::endl;
         return false;
     }
 
-    for (int y = 0; y < config.windowHeight; y++)
-    {
-        for (int x = 0; x < config.windowWidth; x++)
-        {
-            const size_t index =
-                (static_cast<size_t>(y) * static_cast<size_t>(config.windowWidth)) + static_cast<size_t>(x);
+    // In bulk. Feeding this in one pixel at a time cost about a hundred milliseconds at
+    // 1000x800, six times the render it was copying.
+    pixelBuffer.setResolved(&colour[0].x, &albedo[0].x, &normal[0].x, options.samplesPerPixel);
 
-            pixelBuffer.setSample(x, y, colour[index], albedo[index], normal[index]);
-        }
-    }
+    // Measured here rather than by wrapping the call, because everything either side of
+    // it is something other than rendering: building the pipeline before, and tearing
+    // down the CUDA context after. That teardown alone is about eighty five
+    // milliseconds, which is five times a 1000x800 frame and was quietly inside the
+    // reported figure until it was looked for.
+    renderSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - renderStart).count();
 
     return true;
 }
@@ -413,11 +417,12 @@ auto main(int argc, char *argv[]) -> int
             const auto start = std::chrono::steady_clock::now();
 
             double gpuSetupSeconds = 0.0;
+            double gpuRenderSeconds = 0.0;
 
             if (options.useGpu)
             {
 #ifdef PT_HAVE_GPU
-                if (!renderOnGpu(scene, pixelBuffer, options, config, gpuSetupSeconds))
+                if (!renderOnGpu(scene, pixelBuffer, options, config, gpuSetupSeconds, gpuRenderSeconds))
                 {
                     return EXIT_FAILURE;
                 }
@@ -430,10 +435,11 @@ auto main(int argc, char *argv[]) -> int
 
             const auto end = std::chrono::steady_clock::now();
 
-            // Setup is not rendering. It compiles the device code, builds the
-            // acceleration structure and uploads the scene, is paid once, and would
-            // otherwise make every scene appear to take the same nine tenths of a second.
-            const double seconds = std::chrono::duration<double>(end - start).count() - gpuSetupSeconds;
+            // The GPU backend times its own render, because the wall clock around the
+            // call also contains building the pipeline and destroying the CUDA context,
+            // neither of which is rendering and which together dwarf a frame.
+            const double seconds =
+                options.useGpu ? gpuRenderSeconds : std::chrono::duration<double>(end - start).count();
 
             if (gpuSetupSeconds > 0.0)
             {
@@ -544,9 +550,43 @@ auto main(int argc, char *argv[]) -> int
                   << "  Esc          quit" << std::endl;
 
         // Accumulated samples per pixel. The image is refined progressively: each frame
-        // adds one more sample everywhere and the buffer keeps the running average, so
-        // the picture converges the longer the camera is left alone.
+        // adds more samples everywhere and the running average is kept, so the picture
+        // converges the longer the camera is left alone.
         unsigned int accumulated = 0;
+
+#ifdef PT_HAVE_GPU
+        std::unique_ptr<Gpu::Tracer> gpuTracer;
+        std::vector<Vec3> gpuColour;
+        std::vector<Vec3> gpuAlbedo;
+        std::vector<Vec3> gpuNormal;
+
+        // How many samples the GPU takes per frame, chosen to keep the window responsive
+        // rather than fixed. One sample of a simple scene finishes far inside a frame and
+        // wastes the rest of it; one sample of a heavy one may already be too slow. The
+        // count is adjusted from how long the previous frame actually took.
+        unsigned int gpuSamplesPerFrame = 1;
+
+        // Two targets, because a moving camera and a still one want opposite things. While
+        // moving, every sample is about to be thrown away and only the frame rate matters,
+        // so the count drops to one. While still, nobody is waiting on input and the
+        // picture should settle as fast as it can, so frames are allowed to get longer --
+        // bounded, so that moving again is noticed promptly.
+        constexpr double movingFrameSeconds = 1.0 / 30.0;
+        constexpr double settledFrameSeconds = 1.0 / 4.0;
+        constexpr unsigned int maxSamplesPerFrame = 64;
+
+        if (options.useGpu)
+        {
+            std::string gpuError;
+            gpuTracer = Gpu::Tracer::create(scene, gpuError);
+
+            if (gpuTracer == nullptr)
+            {
+                std::cerr << "Could not start the GPU backend: " << gpuError << std::endl;
+                return EXIT_FAILURE;
+            }
+        }
+#endif
 
         // Denoising the live view costs real time, and the picture only changes slowly
         // once it is accumulating, so it is refreshed on an interval rather than every
@@ -601,21 +641,62 @@ auto main(int argc, char *argv[]) -> int
             {
                 const int height = curSize.second;
 
-                constexpr int rowsPerBand = 8;
-                const auto bandCount = static_cast<uint32_t>((height + rowsPerBand - 1) / rowsPerBand);
-
                 // Vary the seed per pass so each one contributes new samples rather than
                 // repeating the previous pass exactly.
                 const uint64_t passSeed = options.seed + (static_cast<uint64_t>(accumulated) * 0x9e3779b97f4a7c15ULL);
 
-                pool.parallelFor(bandCount, [&](uint32_t band) {
-                    const int yStart = static_cast<int>(band) * rowsPerBand;
-                    const int yEnd = std::min(yStart + rowsPerBand, height);
+#ifdef PT_HAVE_GPU
+                if (gpuTracer != nullptr)
+                {
+                    if (gpuTracer->render(camera, curSize.first, height, gpuSamplesPerFrame, passSeed,
+                                          config.maxRecurseLevel, restart, gpuColour, gpuAlbedo, gpuNormal))
+                    {
+                        accumulated = gpuTracer->accumulatedSamples();
 
-                    rayTracer.renderRows(yStart, yEnd, 1, passSeed);
-                });
+                        pixelBuffer.setResolved(&gpuColour[0].x, &gpuAlbedo[0].x, &gpuNormal[0].x, accumulated);
+                    }
 
-                accumulated++;
+                    // Aimed at the whole frame rather than at the render alone. Tone
+                    // mapping and uploading the image cost real milliseconds, and a
+                    // controller that cannot see them keeps asking for more samples while
+                    // the frame rate sits well under target, which is what it did before
+                    // this used deltaTime.
+                    if (restart)
+                    {
+                        // Moving. Back to the most responsive setting at once rather than
+                        // stepping down over several frames, all of which would be slow.
+                        gpuSamplesPerFrame = 1;
+                    }
+                    else
+                    {
+                        const double target =
+                            (accumulated <= gpuSamplesPerFrame) ? movingFrameSeconds : settledFrameSeconds;
+
+                        if (deltaTime > target && gpuSamplesPerFrame > 1)
+                        {
+                            gpuSamplesPerFrame /= 2;
+                        }
+                        else if (deltaTime < target * 0.5 && gpuSamplesPerFrame < maxSamplesPerFrame)
+                        {
+                            gpuSamplesPerFrame *= 2;
+                        }
+                    }
+                }
+                else
+#endif
+                {
+                    constexpr int rowsPerBand = 8;
+                    const auto bandCount = static_cast<uint32_t>((height + rowsPerBand - 1) / rowsPerBand);
+
+                    pool.parallelFor(bandCount, [&](uint32_t band) {
+                        const int yStart = static_cast<int>(band) * rowsPerBand;
+                        const int yEnd = std::min(yStart + rowsPerBand, height);
+
+                        rayTracer.renderRows(yStart, yEnd, 1, passSeed);
+                    });
+
+                    accumulated++;
+                }
             }
 
             if (options.denoiseIterations > 0)

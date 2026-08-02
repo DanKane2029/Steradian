@@ -76,18 +76,31 @@ class Tracer
      * the CPU's per-row stream cannot be reproduced by threads running at once. They
      * converge to the same image rather than to the same noise.
      *
+     * Successive calls accumulate unless restart is asked for, so an interactive view can
+     * add a few samples per frame and show the average of everything taken since the
+     * camera last moved. The sums stay on the device; only the resolved average is
+     * copied back.
+     *
+     * \param camera Where the view is now. Passed per call rather than fixed at build,
+     *        since moving it is the entire point of an interactive view.
      * \param width Image width in pixels.
      * \param height Image height.
-     * \param samplesPerPixel Samples taken for every pixel.
+     * \param samplesPerPixel Samples to add in this call.
      * \param seed Base seed; the same seed reproduces the same image.
      * \param maxDepth Longest path to follow, in bounces.
+     * \param restart True to discard what has accumulated and begin again. Required when
+     *        the camera moves: those samples measured light arriving somewhere else.
      * \param colour Resized to width * height and filled with linear radiance.
      * \param albedo Filled with the first hit's surface colour, for a denoiser.
      * \param normal Filled with the first hit's normal.
      * \returns False if the launch failed.
      */
-    auto render(int width, int height, unsigned int samplesPerPixel, unsigned long long seed, unsigned int maxDepth,
-                std::vector<Vec3> &colour, std::vector<Vec3> &albedo, std::vector<Vec3> &normal) -> bool;
+    auto render(const Camera &camera, int width, int height, unsigned int samplesPerPixel, unsigned long long seed,
+                unsigned int maxDepth, bool restart, std::vector<Vec3> &colour, std::vector<Vec3> &albedo,
+                std::vector<Vec3> &normal) -> bool;
+
+    /** \brief Samples accumulated since the last restart. */
+    auto accumulatedSamples() const -> unsigned int;
 
   private:
     Tracer() = default;

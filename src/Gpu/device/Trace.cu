@@ -773,9 +773,22 @@ extern "C" __global__ void __raygen__render()
         normalTotal += normal;
     }
 
-    const float inverse = 1.0f / static_cast<float>(params.samplesPerPixel);
+    // Fold this launch's samples into the running sums, then resolve. Starting a fresh
+    // accumulation is just a zero prior, so there is no separate clearing pass and no
+    // branch on the host.
+    const bool fresh = params.accumulatedBefore == 0;
 
-    params.film[pixel] = total * inverse;
-    params.filmAlbedo[pixel] = albedoTotal * inverse;
-    params.filmNormal[pixel] = normalTotal * inverse;
+    const Vec3 sumColour = fresh ? total : (params.accumColour[pixel] + total);
+    const Vec3 sumAlbedo = fresh ? albedoTotal : (params.accumAlbedo[pixel] + albedoTotal);
+    const Vec3 sumNormal = fresh ? normalTotal : (params.accumNormal[pixel] + normalTotal);
+
+    params.accumColour[pixel] = sumColour;
+    params.accumAlbedo[pixel] = sumAlbedo;
+    params.accumNormal[pixel] = sumNormal;
+
+    const float inverse = 1.0f / static_cast<float>(params.accumulatedBefore + params.samplesPerPixel);
+
+    params.film[pixel] = sumColour * inverse;
+    params.filmAlbedo[pixel] = sumAlbedo * inverse;
+    params.filmNormal[pixel] = sumNormal * inverse;
 }

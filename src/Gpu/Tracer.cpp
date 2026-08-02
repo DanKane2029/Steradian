@@ -181,7 +181,15 @@ struct Tracer::State
     CUdeviceptr film = 0;
     CUdeviceptr filmAlbedo = 0;
     CUdeviceptr filmNormal = 0;
+    CUdeviceptr accumColour = 0;
+    CUdeviceptr accumAlbedo = 0;
+    CUdeviceptr accumNormal = 0;
     size_t filmCapacity = 0;
+
+    /** samples in the running sums, and the shape they were taken at */
+    unsigned int accumulated = 0;
+    int accumWidth = 0;
+    int accumHeight = 0;
 
     // Ray and result buffers, grown as needed and reused between launches.
     CUdeviceptr rayOrigins = 0;
@@ -195,7 +203,6 @@ struct Tracer::State
     unsigned int sphereCount = 0;
     unsigned int emitterCount = 0;
     Vec3 ambient;
-    Camera camera;
 
     ~State()
     {
@@ -384,7 +391,6 @@ auto Tracer::create(const Scene &scene, std::string &error) -> std::unique_ptr<T
     state.sphereCount = geometry.sphereCount();
     state.emitterCount = static_cast<unsigned int>(scene.getEmitters().size());
     state.ambient = scene.getAmbientLighting();
-    state.camera = scene.getCamera();
 
     // ---- device and contexts ---------------------------------------------------------
     if (!errors.cuda(cuInit(0), "cuInit"))
@@ -810,8 +816,14 @@ auto Tracer::trace(const std::vector<Vec3> &origins, const std::vector<Vec3> &di
     return cuMemcpyDtoH(hits.data(), state.hits, count * sizeof(DeviceHit)) == CUDA_SUCCESS;
 }
 
-auto Tracer::render(int width, int height, unsigned int samplesPerPixel, unsigned long long seed, unsigned int maxDepth,
-                    std::vector<Vec3> &colour, std::vector<Vec3> &albedo, std::vector<Vec3> &normal) -> bool
+auto Tracer::accumulatedSamples() const -> unsigned int
+{
+    return m_State->accumulated;
+}
+
+auto Tracer::render(const Camera &camera, int width, int height, unsigned int samplesPerPixel, unsigned long long seed,
+                    unsigned int maxDepth, bool restart, std::vector<Vec3> &colour, std::vector<Vec3> &albedo,
+                    std::vector<Vec3> &normal) -> bool
 {
     State &state = *m_State;
 
@@ -828,7 +840,8 @@ auto Tracer::render(int width, int height, unsigned int samplesPerPixel, unsigne
 
     if (pixels > state.filmCapacity)
     {
-        for (CUdeviceptr *pointer : {&state.film, &state.filmAlbedo, &state.filmNormal})
+        for (CUdeviceptr *pointer : {&state.film, &state.filmAlbedo, &state.filmNormal, &state.accumColour,
+                                     &state.accumAlbedo, &state.accumNormal})
         {
             if (*pointer != 0)
             {
@@ -839,7 +852,10 @@ auto Tracer::render(int width, int height, unsigned int samplesPerPixel, unsigne
 
         if (cuMemAlloc(&state.film, pixels * sizeof(Vec3)) != CUDA_SUCCESS ||
             cuMemAlloc(&state.filmAlbedo, pixels * sizeof(Vec3)) != CUDA_SUCCESS ||
-            cuMemAlloc(&state.filmNormal, pixels * sizeof(Vec3)) != CUDA_SUCCESS)
+            cuMemAlloc(&state.filmNormal, pixels * sizeof(Vec3)) != CUDA_SUCCESS ||
+            cuMemAlloc(&state.accumColour, pixels * sizeof(Vec3)) != CUDA_SUCCESS ||
+            cuMemAlloc(&state.accumAlbedo, pixels * sizeof(Vec3)) != CUDA_SUCCESS ||
+            cuMemAlloc(&state.accumNormal, pixels * sizeof(Vec3)) != CUDA_SUCCESS)
         {
             return false;
         }
@@ -847,22 +863,35 @@ auto Tracer::render(int width, int height, unsigned int samplesPerPixel, unsigne
         state.filmCapacity = pixels;
     }
 
+    // A resize invalidates the sums as surely as a camera move does: they describe an
+    // image of a different shape.
+    if (restart || width != state.accumWidth || height != state.accumHeight)
+    {
+        state.accumulated = 0;
+        state.accumWidth = width;
+        state.accumHeight = height;
+    }
+
     LaunchParams params = {};
     fillSceneParams(state, params);
 
     // The film plane at unit distance, as RayTracer::makeCameraRay computes it.
-    const float halfHeight = std::tan(state.camera.fovY * 0.5f);
+    const float halfHeight = std::tan(camera.fovY * 0.5f);
 
-    params.camera.origin = state.camera.org;
-    params.camera.direction = state.camera.dir;
-    params.camera.right = state.camera.right;
-    params.camera.up = state.camera.up;
+    params.camera.origin = camera.org;
+    params.camera.direction = camera.dir;
+    params.camera.right = camera.right;
+    params.camera.up = camera.up;
     params.camera.halfHeight = halfHeight;
     params.camera.halfWidth = halfHeight * (static_cast<float>(width) / static_cast<float>(height));
 
     params.film = reinterpret_cast<Vec3 *>(state.film);
     params.filmAlbedo = reinterpret_cast<Vec3 *>(state.filmAlbedo);
     params.filmNormal = reinterpret_cast<Vec3 *>(state.filmNormal);
+    params.accumColour = reinterpret_cast<Vec3 *>(state.accumColour);
+    params.accumAlbedo = reinterpret_cast<Vec3 *>(state.accumAlbedo);
+    params.accumNormal = reinterpret_cast<Vec3 *>(state.accumNormal);
+    params.accumulatedBefore = state.accumulated;
     params.width = width;
     params.height = height;
     params.samplesPerPixel = samplesPerPixel;
@@ -885,9 +914,15 @@ auto Tracer::render(int width, int height, unsigned int samplesPerPixel, unsigne
         return false;
     }
 
-    return cuMemcpyDtoH(colour.data(), state.film, pixels * sizeof(Vec3)) == CUDA_SUCCESS &&
-           cuMemcpyDtoH(albedo.data(), state.filmAlbedo, pixels * sizeof(Vec3)) == CUDA_SUCCESS &&
-           cuMemcpyDtoH(normal.data(), state.filmNormal, pixels * sizeof(Vec3)) == CUDA_SUCCESS;
+    if (cuMemcpyDtoH(colour.data(), state.film, pixels * sizeof(Vec3)) != CUDA_SUCCESS ||
+        cuMemcpyDtoH(albedo.data(), state.filmAlbedo, pixels * sizeof(Vec3)) != CUDA_SUCCESS ||
+        cuMemcpyDtoH(normal.data(), state.filmNormal, pixels * sizeof(Vec3)) != CUDA_SUCCESS)
+    {
+        return false;
+    }
+
+    state.accumulated += samplesPerPixel;
+    return true;
 }
 
 } // namespace Gpu

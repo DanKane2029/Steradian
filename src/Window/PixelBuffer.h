@@ -31,6 +31,23 @@ class PixelBuffer
      */
     void setSample(int x, int y, Vec3 color, Vec3 albedo, Vec3 normal);
 
+    /**
+     * \brief Replaces the whole buffer with an image that has already been averaged.
+     *
+     * A backend that accumulates elsewhere -- the GPU keeps its running sum in device
+     * memory -- has nothing to gain from being fed one sample at a time, and a great deal
+     * to lose: setSample costs about 120 nanoseconds a pixel, which at 1000x800 is a
+     * hundred milliseconds. That was six times the cost of the render it was copying,
+     * and it capped the interactive frame rate at nine frames a second while the GPU sat
+     * idle for most of each one.
+     *
+     * \param color Width * height * 3 floats of linear radiance.
+     * \param albedo Matching surface colour, for the denoiser.
+     * \param normal Matching surface normals.
+     * \param sampleCount How many samples the average was taken over.
+     */
+    void setResolved(const float *color, const float *albedo, const float *normal, unsigned int sampleCount);
+
     auto getPixels() -> float *;
 
     /** base colour of the surface visible at each pixel */

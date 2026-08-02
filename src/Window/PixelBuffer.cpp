@@ -1,5 +1,7 @@
 #include "PixelBuffer.h"
 
+#include <cstring>
+
 #include <algorithm>
 
 /**
@@ -69,6 +71,22 @@ void PixelBuffer::setPixel(int x, int y, Vec3 color)
  *
  * \return - the pointer to the first float value of the buffer
  */
+void PixelBuffer::setResolved(const float *color, const float *albedo, const float *normal, unsigned int sampleCount)
+{
+    const size_t floats = static_cast<size_t>(m_Width) * static_cast<size_t>(m_Height) * 3;
+
+    std::memcpy(m_Buffer, color, floats * sizeof(float));
+    std::memcpy(m_AlbedoBuffer, albedo, floats * sizeof(float));
+    std::memcpy(m_NormalBuffer, normal, floats * sizeof(float));
+
+    // Kept in step so anything reading the per-pixel sample count still agrees with the
+    // image, even though nothing accumulated into this buffer to produce it.
+    for (size_t i = 0; i < static_cast<size_t>(m_Width) * static_cast<size_t>(m_Height); i++)
+    {
+        m_MetaDataBuffer[i].numRaysShot = sampleCount;
+    }
+}
+
 void PixelBuffer::setSample(int x, int y, Vec3 color, Vec3 albedo, Vec3 normal)
 {
     if (x < 0 || y < 0 || static_cast<unsigned int>(x) >= m_Width || static_cast<unsigned int>(y) >= m_Height)

@@ -121,10 +121,25 @@ struct LaunchParams
     // ---- rendering ---------------------------------------------------------------
     DeviceCamera camera;
 
-    /** the accumulated image, and the guides a denoiser needs, one entry per pixel */
+    /**
+     * \brief The running sums, kept on the device between launches.
+     *
+     * An interactive view adds a few samples per frame and shows the average of every
+     * sample taken since the camera last moved. Keeping the sum here means a frame costs
+     * one launch and one copy out, rather than reading the whole image back, averaging it
+     * on the host and writing it again.
+     */
+    Vec3 *accumColour;
+    Vec3 *accumAlbedo;
+    Vec3 *accumNormal;
+
+    /** the resolved average, which is what gets copied back */
     Vec3 *film;
     Vec3 *filmAlbedo;
     Vec3 *filmNormal;
+
+    /** samples already in the sums; zero starts a fresh accumulation */
+    unsigned int accumulatedBefore;
 
     int width;
     int height;
