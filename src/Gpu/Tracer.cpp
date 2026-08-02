@@ -2,6 +2,9 @@
 
 #include "Gpu/Nvrtc.h"
 
+#include "Utils/Microfacet.h"
+
+#include <cmath>
 #include <cstring>
 #include <sstream>
 #include <vector>
@@ -10,7 +13,6 @@
 #include <nvrtc.h>
 
 #include <optix.h>
-#include <optix_function_table_definition.h>
 #include <optix_stack_size.h>
 #include <optix_stubs.h>
 
@@ -107,6 +109,33 @@ template <typename T> auto upload(const std::vector<T> &data, CUdeviceptr &out) 
 namespace Gpu
 {
 
+namespace
+{
+
+/** \brief Fills the part of the launch that every launch shape shares. */
+template <typename StateType> void fillSceneParams(const StateType &state, LaunchParams &params)
+{
+    params.handle = state.handle;
+
+    params.geometry.positions = reinterpret_cast<const Vec3 *>(state.vertices);
+    params.geometry.normals = reinterpret_cast<const Vec3 *>(state.normals);
+    params.geometry.texCoords = reinterpret_cast<const Vec3 *>(state.texCoords);
+    params.geometry.triangles = reinterpret_cast<const Triangle *>(state.triangles);
+    params.geometry.spheres = reinterpret_cast<const Sphere *>(state.spheres);
+    params.geometry.triangleCount = state.triangleCount;
+    params.geometry.sphereCount = state.sphereCount;
+
+    params.materials = reinterpret_cast<const Material *>(state.materials);
+    params.emitters = reinterpret_cast<const Emitter *>(state.emitters);
+    params.emitterCount = state.emitterCount;
+    params.albedoTable = reinterpret_cast<const float *>(state.albedoTable);
+    params.textures = reinterpret_cast<const DeviceTexture *>(state.textures);
+    params.texturePixels = reinterpret_cast<const float *>(state.texturePixels);
+    params.ambient = state.ambient;
+}
+
+} // namespace
+
 /**
  * \brief Everything the tracer owns on the device.
  *
@@ -120,6 +149,7 @@ struct Tracer::State
 
     OptixModule module = nullptr;
     OptixProgramGroup raygenGroup = nullptr;
+    OptixProgramGroup renderGroup = nullptr;
     OptixProgramGroup missGroup = nullptr;
     OptixProgramGroup triangleGroup = nullptr;
     OptixProgramGroup sphereGroup = nullptr;
@@ -138,7 +168,20 @@ struct Tracer::State
     CUdeviceptr ias = 0;
 
     CUdeviceptr spheres = 0;
+    CUdeviceptr triangles = 0;
+    CUdeviceptr normals = 0;
+    CUdeviceptr texCoords = 0;
+    CUdeviceptr materials = 0;
+    CUdeviceptr emitters = 0;
+    CUdeviceptr albedoTable = 0;
+    CUdeviceptr textures = 0;
+    CUdeviceptr texturePixels = 0;
     CUdeviceptr sbtRecords = 0;
+
+    CUdeviceptr film = 0;
+    CUdeviceptr filmAlbedo = 0;
+    CUdeviceptr filmNormal = 0;
+    size_t filmCapacity = 0;
 
     // Ray and result buffers, grown as needed and reused between launches.
     CUdeviceptr rayOrigins = 0;
@@ -150,6 +193,9 @@ struct Tracer::State
     OptixTraversableHandle handle = 0;
     unsigned int triangleCount = 0;
     unsigned int sphereCount = 0;
+    unsigned int emitterCount = 0;
+    Vec3 ambient;
+    Camera camera;
 
     ~State()
     {
@@ -157,7 +203,7 @@ struct Tracer::State
         {
             optixPipelineDestroy(pipeline);
         }
-        for (OptixProgramGroup group : {raygenGroup, missGroup, triangleGroup, sphereGroup})
+        for (OptixProgramGroup group : {raygenGroup, renderGroup, missGroup, triangleGroup, sphereGroup})
         {
             if (group != nullptr)
             {
@@ -173,8 +219,10 @@ struct Tracer::State
             optixDeviceContextDestroy(optix);
         }
 
-        for (CUdeviceptr pointer : {vertices, indices, aabbs, triangleGas, sphereGas, instances, ias, spheres,
-                                    sbtRecords, rayOrigins, rayDirections, hits, launchParams})
+        for (CUdeviceptr pointer :
+             {vertices,   indices,    aabbs,         triangleGas, sphereGas,    instances,   ias,        spheres,
+              triangles,  normals,    texCoords,     materials,   emitters,     albedoTable, textures,   texturePixels,
+              sbtRecords, rayOrigins, rayDirections, hits,        launchParams, film,        filmAlbedo, filmNormal})
         {
             if (pointer != 0)
             {
@@ -321,8 +369,10 @@ auto buildAccel(OptixDeviceContext context, const OptixBuildInput &input, CUdevi
 
 Tracer::~Tracer() = default;
 
-auto Tracer::create(const Geometry &geometry, std::string &error) -> std::unique_ptr<Tracer>
+auto Tracer::create(const Scene &scene, std::string &error) -> std::unique_ptr<Tracer>
 {
+    const Geometry &geometry = scene.getGeometry();
+
     error.clear();
     ErrorSink errors(error);
 
@@ -332,6 +382,9 @@ auto Tracer::create(const Geometry &geometry, std::string &error) -> std::unique
 
     state.triangleCount = geometry.triangleCount();
     state.sphereCount = geometry.sphereCount();
+    state.emitterCount = static_cast<unsigned int>(scene.getEmitters().size());
+    state.ambient = scene.getAmbientLighting();
+    state.camera = scene.getCamera();
 
     // ---- device and contexts ---------------------------------------------------------
     if (!errors.cuda(cuInit(0), "cuInit"))
@@ -408,6 +461,11 @@ auto Tracer::create(const Geometry &geometry, std::string &error) -> std::unique
     raygenDesc.raygen.module = state.module;
     raygenDesc.raygen.entryFunctionName = "__raygen__trace";
 
+    OptixProgramGroupDesc renderDesc = {};
+    renderDesc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
+    renderDesc.raygen.module = state.module;
+    renderDesc.raygen.entryFunctionName = "__raygen__render";
+
     OptixProgramGroupDesc missDesc = {};
     missDesc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
     missDesc.miss.module = state.module;
@@ -426,6 +484,7 @@ auto Tracer::create(const Geometry &geometry, std::string &error) -> std::unique
     sphereDesc.hitgroup.entryFunctionNameIS = "__intersection__sphere";
 
     if (!makeGroup(raygenDesc, state.raygenGroup, "raygen program group") ||
+        !makeGroup(renderDesc, state.renderGroup, "render program group") ||
         !makeGroup(missDesc, state.missGroup, "miss program group") ||
         !makeGroup(triangleDesc, state.triangleGroup, "triangle hit group") ||
         !makeGroup(sphereDesc, state.sphereGroup, "sphere hit group"))
@@ -433,12 +492,14 @@ auto Tracer::create(const Geometry &geometry, std::string &error) -> std::unique
         return nullptr;
     }
 
-    OptixProgramGroup groups[] = {state.raygenGroup, state.missGroup, state.triangleGroup, state.sphereGroup};
+    OptixProgramGroup groups[] = {state.raygenGroup, state.renderGroup, state.missGroup, state.triangleGroup,
+                                  state.sphereGroup};
 
     OptixPipelineLinkOptions linkOptions = {};
 
-    // One trace per raygen invocation, no recursion: the path loop iterates rather than
-    // recursing, on the device for the same reason it does on the host.
+    // The path loop iterates rather than recursing, and a shadow ray is traced from the
+    // raygen program rather than from a hit program, so one level is all that is ever
+    // nested.
     linkOptions.maxTraceDepth = 1;
 
     logSize = sizeof(log);
@@ -469,6 +530,39 @@ auto Tracer::create(const Geometry &geometry, std::string &error) -> std::unique
                       "optixPipelineSetStackSize"))
     {
         return nullptr;
+    }
+
+    // ---- everything shading reads ----------------------------------------------------
+    //
+    // Uploaded once. Materials are already a plain block of numbers, so they cross as
+    // bytes with no conversion; that was the point of making them one.
+    {
+        std::vector<DeviceTexture> textureDescriptions;
+        std::vector<float> texturePixels;
+
+        for (const Texture &texture : scene.getTextures())
+        {
+            DeviceTexture description = {};
+            description.offset = static_cast<unsigned int>(texturePixels.size());
+            description.width = texture.getWidth();
+            description.height = texture.getHeight();
+            description.channels = texture.getChannels();
+
+            textureDescriptions.push_back(description);
+            texturePixels.insert(texturePixels.end(), texture.getData().begin(), texture.getData().end());
+        }
+
+        constexpr size_t albedoEntries = Microfacet::albedoResolution * Microfacet::albedoResolution;
+
+        if (!upload(geometry.getNormals(), state.normals) || !upload(geometry.getTexCoords(), state.texCoords) ||
+            !upload(geometry.getTriangles(), state.triangles) || !upload(scene.getMaterials(), state.materials) ||
+            !upload(scene.getEmitters(), state.emitters) ||
+            !upload(Microfacet::hostAlbedoTable(), albedoEntries, state.albedoTable) ||
+            !upload(textureDescriptions, state.textures) || !upload(texturePixels, state.texturePixels))
+        {
+            errors.set("could not upload the scene");
+            return nullptr;
+        }
     }
 
     // ---- acceleration structures -----------------------------------------------------
@@ -608,11 +702,15 @@ auto Tracer::create(const Geometry &geometry, std::string &error) -> std::unique
     // Four records, none of which carries any data of its own: everything the programs
     // read comes from the launch parameters instead. That is what keeps this the simple
     // shape rather than the intimidating one.
-    std::vector<EmptyRecord> records(4);
+    // Five records: two raygen programs, one miss, and one hit group per primitive kind.
+    // Both raygen records live in the table and the launch points at whichever it wants,
+    // which is cheaper than keeping two tables that differ in one entry.
+    std::vector<EmptyRecord> records(5);
     if (!errors.optix(optixSbtRecordPackHeader(state.raygenGroup, &records[0]), "packing the raygen record") ||
-        !errors.optix(optixSbtRecordPackHeader(state.missGroup, &records[1]), "packing the miss record") ||
-        !errors.optix(optixSbtRecordPackHeader(state.triangleGroup, &records[2]), "packing the triangle record") ||
-        !errors.optix(optixSbtRecordPackHeader(state.sphereGroup, &records[3]), "packing the sphere record"))
+        !errors.optix(optixSbtRecordPackHeader(state.renderGroup, &records[1]), "packing the render record") ||
+        !errors.optix(optixSbtRecordPackHeader(state.missGroup, &records[2]), "packing the miss record") ||
+        !errors.optix(optixSbtRecordPackHeader(state.triangleGroup, &records[3]), "packing the triangle record") ||
+        !errors.optix(optixSbtRecordPackHeader(state.sphereGroup, &records[4]), "packing the sphere record"))
     {
         return nullptr;
     }
@@ -621,7 +719,7 @@ auto Tracer::create(const Geometry &geometry, std::string &error) -> std::unique
     // offset selects its own program. With no triangles, the sphere record moves first.
     if (state.triangleCount == 0)
     {
-        records[2] = records[3];
+        records[3] = records[4];
     }
 
     if (!upload(records, state.sbtRecords))
@@ -631,10 +729,10 @@ auto Tracer::create(const Geometry &geometry, std::string &error) -> std::unique
     }
 
     state.sbt.raygenRecord = state.sbtRecords;
-    state.sbt.missRecordBase = state.sbtRecords + sizeof(EmptyRecord);
+    state.sbt.missRecordBase = state.sbtRecords + (2 * sizeof(EmptyRecord));
     state.sbt.missRecordStrideInBytes = sizeof(EmptyRecord);
     state.sbt.missRecordCount = 1;
-    state.sbt.hitgroupRecordBase = state.sbtRecords + (2 * sizeof(EmptyRecord));
+    state.sbt.hitgroupRecordBase = state.sbtRecords + (3 * sizeof(EmptyRecord));
     state.sbt.hitgroupRecordStrideInBytes = sizeof(EmptyRecord);
     state.sbt.hitgroupRecordCount = 2;
 
@@ -686,10 +784,7 @@ auto Tracer::trace(const std::vector<Vec3> &origins, const std::vector<Vec3> &di
     cuMemcpyHtoD(state.rayDirections, directions.data(), count * sizeof(Vec3));
 
     LaunchParams params = {};
-    params.handle = state.handle;
-    params.geometry.spheres = reinterpret_cast<const Sphere *>(state.spheres);
-    params.geometry.triangleCount = state.triangleCount;
-    params.geometry.sphereCount = state.sphereCount;
+    fillSceneParams(state, params);
     params.rayOrigins = reinterpret_cast<const Vec3 *>(state.rayOrigins);
     params.rayDirections = reinterpret_cast<const Vec3 *>(state.rayDirections);
     params.hits = reinterpret_cast<DeviceHit *>(state.hits);
@@ -698,6 +793,8 @@ auto Tracer::trace(const std::vector<Vec3> &origins, const std::vector<Vec3> &di
     params.rayCount = static_cast<unsigned int>(count);
 
     cuMemcpyHtoD(state.launchParams, &params, sizeof(params));
+
+    state.sbt.raygenRecord = state.sbtRecords;
 
     if (optixLaunch(state.pipeline, nullptr, state.launchParams, sizeof(LaunchParams), &state.sbt,
                     static_cast<unsigned int>(count), 1, 1) != OPTIX_SUCCESS)
@@ -711,6 +808,86 @@ auto Tracer::trace(const std::vector<Vec3> &origins, const std::vector<Vec3> &di
     }
 
     return cuMemcpyDtoH(hits.data(), state.hits, count * sizeof(DeviceHit)) == CUDA_SUCCESS;
+}
+
+auto Tracer::render(int width, int height, unsigned int samplesPerPixel, unsigned long long seed, unsigned int maxDepth,
+                    std::vector<Vec3> &colour, std::vector<Vec3> &albedo, std::vector<Vec3> &normal) -> bool
+{
+    State &state = *m_State;
+
+    if (width <= 0 || height <= 0 || samplesPerPixel == 0)
+    {
+        return false;
+    }
+
+    const size_t pixels = static_cast<size_t>(width) * static_cast<size_t>(height);
+
+    colour.resize(pixels);
+    albedo.resize(pixels);
+    normal.resize(pixels);
+
+    if (pixels > state.filmCapacity)
+    {
+        for (CUdeviceptr *pointer : {&state.film, &state.filmAlbedo, &state.filmNormal})
+        {
+            if (*pointer != 0)
+            {
+                cuMemFree(*pointer);
+                *pointer = 0;
+            }
+        }
+
+        if (cuMemAlloc(&state.film, pixels * sizeof(Vec3)) != CUDA_SUCCESS ||
+            cuMemAlloc(&state.filmAlbedo, pixels * sizeof(Vec3)) != CUDA_SUCCESS ||
+            cuMemAlloc(&state.filmNormal, pixels * sizeof(Vec3)) != CUDA_SUCCESS)
+        {
+            return false;
+        }
+
+        state.filmCapacity = pixels;
+    }
+
+    LaunchParams params = {};
+    fillSceneParams(state, params);
+
+    // The film plane at unit distance, as RayTracer::makeCameraRay computes it.
+    const float halfHeight = std::tan(state.camera.fovY * 0.5f);
+
+    params.camera.origin = state.camera.org;
+    params.camera.direction = state.camera.dir;
+    params.camera.right = state.camera.right;
+    params.camera.up = state.camera.up;
+    params.camera.halfHeight = halfHeight;
+    params.camera.halfWidth = halfHeight * (static_cast<float>(width) / static_cast<float>(height));
+
+    params.film = reinterpret_cast<Vec3 *>(state.film);
+    params.filmAlbedo = reinterpret_cast<Vec3 *>(state.filmAlbedo);
+    params.filmNormal = reinterpret_cast<Vec3 *>(state.filmNormal);
+    params.width = width;
+    params.height = height;
+    params.samplesPerPixel = samplesPerPixel;
+    params.maxDepth = maxDepth;
+    params.seed = seed;
+
+    cuMemcpyHtoD(state.launchParams, &params, sizeof(params));
+
+    // The render raygen rather than the bare traversal one.
+    state.sbt.raygenRecord = state.sbtRecords + sizeof(EmptyRecord);
+
+    if (optixLaunch(state.pipeline, nullptr, state.launchParams, sizeof(LaunchParams), &state.sbt,
+                    static_cast<unsigned int>(width), static_cast<unsigned int>(height), 1) != OPTIX_SUCCESS)
+    {
+        return false;
+    }
+
+    if (cuCtxSynchronize() != CUDA_SUCCESS)
+    {
+        return false;
+    }
+
+    return cuMemcpyDtoH(colour.data(), state.film, pixels * sizeof(Vec3)) == CUDA_SUCCESS &&
+           cuMemcpyDtoH(albedo.data(), state.filmAlbedo, pixels * sizeof(Vec3)) == CUDA_SUCCESS &&
+           cuMemcpyDtoH(normal.data(), state.filmNormal, pixels * sizeof(Vec3)) == CUDA_SUCCESS;
 }
 
 } // namespace Gpu

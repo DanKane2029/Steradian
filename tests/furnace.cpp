@@ -10,15 +10,87 @@
 // make the sphere darker or brighter than its surroundings, and the sphere becomes
 // visible against a background it should vanish into.
 //
-// Usage: furnace <scene.json> [samplesPerPixel]
+// The same invariant is checked on both backends, and that is the point of checking it
+// this way. It asserts a physical property rather than a stored number, so it needs no
+// reference image and cannot be quietly re-baselined; it transfers to a new backend
+// without losing any of its force. A GPU path loop that drops a cosine fails this exactly
+// as loudly as a CPU one would.
+//
+// Usage: furnace <scene.json> [samplesPerPixel] [--device gpu]
 
 #include "RayTracer/Integrator.h"
 #include "Scene/Scene.h"
 #include "Utils/Random.h"
 
+#ifdef PT_HAVE_GPU
+#include "Gpu/Tracer.h"
+#endif
+
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <string>
+#include <vector>
+
+namespace
+{
+
+#ifdef PT_HAVE_GPU
+
+/**
+ * \brief The furnace measurement, taken on the GPU.
+ *
+ * Renders a small image and averages the middle of it. The sphere subtends about 39
+ * degrees of a 45 degree view, so the central third is comfortably inside its silhouette
+ * and every path averaged there had to interact with the surface before escaping.
+ *
+ * \returns The mean radiance, or a negative value if the render failed.
+ */
+auto measureOnGpu(const Scene &scene, int samples) -> float
+{
+    std::string error;
+    const std::unique_ptr<Gpu::Tracer> tracer = Gpu::Tracer::create(scene, error);
+
+    if (tracer == nullptr)
+    {
+        std::fprintf(stderr, "could not start the GPU backend: %s\n", error.c_str());
+        return -1.0f;
+    }
+
+    constexpr int size = 48;
+
+    std::vector<Vec3> colour;
+    std::vector<Vec3> albedo;
+    std::vector<Vec3> normal;
+
+    if (!tracer->render(size, size, static_cast<unsigned int>(samples), 99, 12, colour, albedo, normal))
+    {
+        std::fprintf(stderr, "the GPU render failed\n");
+        return -1.0f;
+    }
+
+    const int low = size / 3;
+    const int high = size - low;
+
+    double total = 0.0;
+    int counted = 0;
+
+    for (int y = low; y < high; y++)
+    {
+        for (int x = low; x < high; x++)
+        {
+            total += colour[(static_cast<size_t>(y) * size) + static_cast<size_t>(x)].x;
+            counted++;
+        }
+    }
+
+    return static_cast<float>(total / counted);
+}
+
+#endif
+
+} // namespace
 
 auto main(int argc, char *argv[]) -> int
 {
@@ -28,13 +100,55 @@ auto main(int argc, char *argv[]) -> int
         return 2;
     }
 
-    const int samples = (argc > 2) ? std::atoi(argv[2]) : 4000;
+    bool useGpu = false;
+    int samples = 4000;
+
+    for (int i = 2; i < argc; i++)
+    {
+        if (std::strcmp(argv[i], "--device") == 0 && (i + 1) < argc)
+        {
+            useGpu = std::strcmp(argv[++i], "gpu") == 0;
+        }
+        else
+        {
+            samples = std::atoi(argv[i]);
+        }
+    }
 
     Scene scene(argv[1]);
     scene.createAcceleratedStructure(4);
 
     const Vec3 environment = scene.getAmbientLighting();
     const float expected = environment.x;
+
+    if (useGpu)
+    {
+#ifndef PT_HAVE_GPU
+        std::fprintf(stderr, "this build has no GPU support\n");
+        return 1;
+#else
+        const float measured = measureOnGpu(scene, samples);
+
+        if (measured < 0.0f)
+        {
+            return 1;
+        }
+
+        const float gpuError = std::fabs(measured - expected) / expected;
+
+        std::printf("GPU: environment radiance %.4f, surface renders as %.4f (%.2f%% error, %d samples)\n", expected,
+                    measured, gpuError * 100.0f, samples);
+
+        if (!std::isfinite(measured) || gpuError > 0.02f)
+        {
+            std::fprintf(stderr, "furnace test failed on the GPU: a fully reflective surface in a uniform "
+                                 "environment must match that environment exactly\n");
+            return 1;
+        }
+
+        return 0;
+#endif
+    }
 
     Integrator integrator(&scene, 12);
 

@@ -45,7 +45,11 @@ if(PT_GPU_ENABLED)
     set(PT_DEVICE_SOURCES
         Utils/DeviceCompat.h
         Utils/Vec3.h
+        Utils/Random.h
+        Utils/Sampling.h
+        Utils/Microfacet.h
         Scene/Primitives.h
+        Scene/Material.h
         Gpu/DeviceTypes.h
         Gpu/device/Trace.cu
     )
@@ -66,7 +70,7 @@ if(PT_GPU_ENABLED)
         VERBATIM
     )
 
-    add_library(pt_gpu STATIC Gpu/DeviceInfo.cpp Gpu/Nvrtc.cpp Gpu/Tracer.cpp ${PT_DEVICE_SOURCES_HEADER})
+    add_library(pt_gpu STATIC Gpu/DeviceInfo.cpp Gpu/Nvrtc.cpp Gpu/OptixTable.cpp Gpu/Tracer.cpp ${PT_DEVICE_SOURCES_HEADER})
 
     target_include_directories(pt_gpu PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
     target_link_libraries(pt_gpu PUBLIC pt_core)
@@ -96,6 +100,7 @@ if(PT_GPU_ENABLED)
     set_target_properties(steradian PROPERTIES BUILD_RPATH "${PT_GPU_SDK_DIR}/lib")
 
     target_link_libraries(steradian PRIVATE pt_gpu)
+    set_target_properties(steradian PROPERTIES BUILD_RPATH "${PT_GPU_SDK_DIR}/lib")
     target_compile_definitions(steradian PRIVATE PT_HAVE_GPU)
 endif()
 

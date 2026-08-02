@@ -15,6 +15,7 @@
 
 #ifdef PT_HAVE_GPU
 #include "Gpu/DeviceInfo.h"
+#include "Gpu/Tracer.h"
 #endif
 
 #include <algorithm>
@@ -48,6 +49,9 @@ struct Options
     bool headless = false;
     bool showHelp = false;
     bool showGpuInfo = false;
+
+    /** true when --device gpu was asked for */
+    bool useGpu = false;
 };
 
 void printUsage(const char *program)
@@ -75,6 +79,8 @@ void printUsage(const char *program)
               << "                     --samples then sets the maximum rather than the count\n"
               << "  --headless         Render once and exit without opening a window.\n"
               << "                     Combine with --out to save the result\n"
+              << "  --device <cpu|gpu> Which backend renders (default cpu). gpu needs a build\n"
+              << "                     configured with -DPT_ENABLE_GPU=ON\n"
               << "  --gpu-info         Report the GPU, OptiX and NVRTC this build can see,\n"
               << "                     then exit. Needs a build configured with\n"
               << "                     -DPT_ENABLE_GPU=ON\n"
@@ -127,6 +133,19 @@ auto parseArgs(int argc, char *argv[]) -> Options
         if (arg == "--help" || arg == "-h")
         {
             options.showHelp = true;
+        }
+        else if (arg == "--device")
+        {
+            const std::string device = takeValue(argc, argv, i, "--device");
+
+            if (device == "gpu")
+            {
+                options.useGpu = true;
+            }
+            else if (device != "cpu")
+            {
+                throw std::invalid_argument("--device must be cpu or gpu, got '" + device + "'");
+            }
         }
         else if (arg == "--gpu-info")
         {
@@ -202,8 +221,9 @@ auto parseArgs(int argc, char *argv[]) -> Options
         options.scenePath = positional[1];
     }
 
-    // Asking for a file implies a headless render.
-    if (!options.outputPath.empty())
+    // Asking for a file implies a headless render, and so does asking for the GPU: the
+    // viewer accumulates through the CPU sampler and has no GPU path yet.
+    if (!options.outputPath.empty() || options.useGpu)
     {
         options.headless = true;
     }
@@ -243,6 +263,63 @@ void renderHeadless(RayTracer &rayTracer, PixelBuffer &pixelBuffer, const Option
         rayTracer.renderRows(yStart, yEnd, options.samplesPerPixel, options.seed);
     });
 }
+
+#ifdef PT_HAVE_GPU
+
+/**
+ * \brief Renders the whole image on the GPU and copies it into the pixel buffer.
+ *
+ * The buffer accumulates samples, and the device has already averaged its own, so each
+ * pixel is written once with the mean it arrived at. Everything after this -- tone
+ * mapping, denoising, writing the PNG -- is the same code the CPU path uses.
+ */
+auto renderOnGpu(const Scene &scene, PixelBuffer &pixelBuffer, const Options &options, const Config &config,
+                 double &setupSeconds) -> bool
+{
+    // Timed and reported apart from the render, because it is paid once and is not what
+    // anyone means by how long a render took: it compiles the device code, builds the
+    // acceleration structure and uploads the scene. Folding it into the render time
+    // would have made every scene look like it took the same nine tenths of a second.
+    const auto setupStart = std::chrono::steady_clock::now();
+
+    std::string error;
+    const std::unique_ptr<Gpu::Tracer> tracer = Gpu::Tracer::create(scene, error);
+
+    if (tracer == nullptr)
+    {
+        std::cerr << "Could not start the GPU backend: " << error << std::endl;
+        return false;
+    }
+
+    const auto setupEnd = std::chrono::steady_clock::now();
+    setupSeconds = std::chrono::duration<double>(setupEnd - setupStart).count();
+
+    std::vector<Vec3> colour;
+    std::vector<Vec3> albedo;
+    std::vector<Vec3> normal;
+
+    if (!tracer->render(config.windowWidth, config.windowHeight, options.samplesPerPixel, options.seed,
+                        config.maxRecurseLevel, colour, albedo, normal))
+    {
+        std::cerr << "The GPU render failed." << std::endl;
+        return false;
+    }
+
+    for (int y = 0; y < config.windowHeight; y++)
+    {
+        for (int x = 0; x < config.windowWidth; x++)
+        {
+            const size_t index =
+                (static_cast<size_t>(y) * static_cast<size_t>(config.windowWidth)) + static_cast<size_t>(x);
+
+            pixelBuffer.setSample(x, y, colour[index], albedo[index], normal[index]);
+        }
+    }
+
+    return true;
+}
+
+#endif
 
 } // namespace
 
@@ -308,17 +385,61 @@ auto main(int argc, char *argv[]) -> int
             RayTracer rayTracer(&pixelBuffer, &scene, config);
             rayTracer.setAdaptiveTolerance(options.adaptiveTolerance);
 
+            if (options.useGpu)
+            {
+#ifndef PT_HAVE_GPU
+                std::cerr << "This build has no GPU support.\n"
+                          << "Fetch the headers with scripts/setup-gpu-deps.sh, then configure\n"
+                          << "with -DPT_ENABLE_GPU=ON.\n";
+                return EXIT_FAILURE;
+#else
+                if (options.adaptiveTolerance > 0.0f)
+                {
+                    // Said rather than ignored. Adaptive sampling is per pixel and ports
+                    // naturally, but it is not written yet, and silently rendering
+                    // something other than what was asked for is worse than saying so.
+                    std::cerr << "Note: --adaptive is not implemented on the GPU and is being ignored.\n";
+                }
+#endif
+            }
+
             std::cout << "Rendering " << config.windowWidth << "x" << config.windowHeight << " at "
-                      << options.samplesPerPixel << " spp on " << numThreads << " thread(s), seed " << options.seed
-                      << "..." << std::endl;
+                      << options.samplesPerPixel << " spp on "
+                      << (options.useGpu ? std::string("the GPU") : (std::to_string(numThreads) + " thread(s)"))
+                      << ", seed " << options.seed << "..." << std::endl;
 
             ThreadPool pool(numThreads);
 
             const auto start = std::chrono::steady_clock::now();
-            renderHeadless(rayTracer, pixelBuffer, options, pool);
+
+            double gpuSetupSeconds = 0.0;
+
+            if (options.useGpu)
+            {
+#ifdef PT_HAVE_GPU
+                if (!renderOnGpu(scene, pixelBuffer, options, config, gpuSetupSeconds))
+                {
+                    return EXIT_FAILURE;
+                }
+#endif
+            }
+            else
+            {
+                renderHeadless(rayTracer, pixelBuffer, options, pool);
+            }
+
             const auto end = std::chrono::steady_clock::now();
 
-            const double seconds = std::chrono::duration<double>(end - start).count();
+            // Setup is not rendering. It compiles the device code, builds the
+            // acceleration structure and uploads the scene, is paid once, and would
+            // otherwise make every scene appear to take the same nine tenths of a second.
+            const double seconds = std::chrono::duration<double>(end - start).count() - gpuSetupSeconds;
+
+            if (gpuSetupSeconds > 0.0)
+            {
+                std::cout << "GPU setup took " << gpuSetupSeconds
+                          << " s (compiling device code, building the acceleration structure)" << std::endl;
+            }
             const double samples = static_cast<double>(config.windowWidth) * static_cast<double>(config.windowHeight) *
                                    static_cast<double>(options.samplesPerPixel);
 
@@ -332,7 +453,9 @@ auto main(int argc, char *argv[]) -> int
                           << (100.0 * static_cast<double>(used) / static_cast<double>(possible)) << "%)" << std::endl;
             }
 
-            if (Stats::enabled())
+            // The counters are incremented by the CPU traversal, so a GPU render leaves them
+            // at zero. Printing three zeroes would read as a result rather than an absence.
+            if (Stats::enabled() && !options.useGpu)
             {
                 const Stats::Counters counters = Stats::total();
                 const auto perRay = [&](uint64_t n) {

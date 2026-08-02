@@ -20,19 +20,8 @@ class Scene
     Scene(std::string filePath);
 
   public:
-    /**
-     * \brief A light that direct lighting samples explicitly.
-     *
-     * Spherical, because that is the shape the scene format already describes and it is
-     * cheap to sample uniformly. Emissive geometry of other shapes still lights the scene
-     * through ordinary path tracing, just with more noise.
-     */
-    struct Emitter
-    {
-        Vec3 center;
-        float radius = 0.0f;
-        Vec3 emission;
-    };
+    /** the emitter record, shared with the device backend */
+    using Emitter = ::Emitter;
 
   private:
     struct Keywords
@@ -112,6 +101,18 @@ class Scene
     auto getMaterialByIndex(uint32_t index) const -> const Material &
     {
         return m_Materials[index];
+    }
+
+    /** the material array, for a backend that uploads it wholesale */
+    auto getMaterials() const -> const std::vector<Material> &
+    {
+        return m_Materials;
+    }
+
+    /** the textures materials index into */
+    auto getTextures() const -> const std::vector<Texture> &
+    {
+        return m_Textures;
     }
 
     /** the emitters direct lighting samples explicitly */

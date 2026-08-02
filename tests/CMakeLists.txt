@@ -35,6 +35,21 @@ target_link_libraries(image_compare PRIVATE pt_core pt_warnings)
 add_executable(furnace furnace.cpp)
 target_link_libraries(furnace PRIVATE pt_core pt_warnings)
 
+# The same invariant on the GPU. It is the first thing that should run on a new backend,
+# because it needs no reference image and cannot be quietly re-baselined.
+if(PT_GPU_ENABLED)
+    target_link_libraries(furnace PRIVATE pt_gpu)
+    target_compile_definitions(furnace PRIVATE PT_HAVE_GPU)
+    set_target_properties(furnace PROPERTIES BUILD_RPATH "${PT_GPU_SDK_DIR}/lib")
+
+    add_test(NAME device.furnace
+        COMMAND furnace ${CMAKE_CURRENT_SOURCE_DIR}/furnace_scene.json 4000 --device gpu)
+    add_test(NAME device.furnace.metal
+        COMMAND furnace ${CMAKE_CURRENT_SOURCE_DIR}/furnace_metal_scene.json 4000 --device gpu)
+
+    set_tests_properties(device.furnace device.furnace.metal PROPERTIES TIMEOUT 300)
+endif()
+
 add_test(NAME furnace COMMAND furnace ${CMAKE_CURRENT_SOURCE_DIR}/furnace_scene.json 20000)
 set_tests_properties(furnace PROPERTIES TIMEOUT 300)
 
@@ -168,5 +183,19 @@ if(PT_GPU_ENABLED)
         add_test(NAME device.traversal.${scene}
             COMMAND device_traversal ${CMAKE_SOURCE_DIR}/res/scenes/${scene}.json 200000)
         set_tests_properties(device.traversal.${scene} PROPERTIES TIMEOUT 300)
+    endforeach()
+
+    # Whether the two backends converge to the same image. They cannot produce the same
+    # pixels -- they seed differently and carry different noise -- so what is asserted is
+    # that they differ from each other by no more than either differs from itself.
+    add_executable(device_agreement device_agreement.cpp)
+
+    target_link_libraries(device_agreement PRIVATE pt_core pt_gpu pt_warnings)
+    set_target_properties(device_agreement PROPERTIES BUILD_RPATH "${PT_GPU_SDK_DIR}/lib")
+
+    foreach(scene cornell_box glossy_spheres glass_lens glass_tinted textured_spheres test_obj_ball)
+        add_test(NAME device.agreement.${scene}
+            COMMAND device_agreement ${CMAKE_SOURCE_DIR}/res/scenes/${scene}.json 256)
+        set_tests_properties(device.agreement.${scene} PROPERTIES TIMEOUT 600)
     endforeach()
 endif()

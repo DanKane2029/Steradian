@@ -72,15 +72,35 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release \
 
 ### GPU support
 
-**Nothing renders on the GPU yet.** What exists today is the toolchain, a maths core that
-compiles for both, and ray traversal running on the RT cores. The renderer itself is
-unchanged, and a build without `PT_ENABLE_GPU` is byte-for-byte the same as one from
-before any of it existed.
+The renderer runs on the GPU. A build without `PT_ENABLE_GPU` is byte-for-byte the same
+as one from before any of this existed, and the CPU renderer is untouched — it is the
+correctness oracle the GPU backend is checked against.
 
 ```sh
 scripts/build.sh --gpu
 ./build-gpu/src/steradian --gpu-info
+
+./build-gpu/src/steradian --config res/configs/test_config.json \
+                          --scene  res/scenes/dragon.json \
+                          --out    render.png --samples 256 --device gpu
 ```
+
+At 400x320 and 64 samples per pixel, against eight CPU threads:
+
+| Scene | CPU | GPU | |
+|---|---|---|---|
+| `cornell_box` | 0.80 s | 0.166 s | 4.8x |
+| `dragon` | 19.70 s | 0.158 s | **125x** |
+| `glass_dragon` | 35.83 s | 0.135 s | **265x** |
+| `bunny` | 30.98 s | 0.114 s | **271x** |
+
+The Cornell box gains least, and that is the honest shape of the result rather than a
+disappointment: it is a ten-triangle scene, so about sixty milliseconds of fixed launch
+cost is most of its render. Give it more work and the ratio grows — the dragon at 256
+samples takes 81.4 s on the CPU and 0.23 s on the GPU, which is **352x**. Setup, about
+0.75 s to compile the device code and build the acceleration structure, is timed and
+reported separately, because folding it in made every scene look like it took the same
+nine tenths of a second.
 
 Most of what a GPU path needs is already present on any machine with an NVIDIA driver.
 `libcuda.so.1` and OptiX itself, `libnvoptix.so.1`, both ship *with the display driver*
@@ -103,6 +123,39 @@ resident threads and **RT core version 20** — the fixed-function ray/box inter
 hardware. That last number is the one that matters: the dragon spends 658 bounding box
 visits per ray against 87.5 triangle tests, so traversal is the cost, and traversal is
 exactly what that silicon does.
+
+#### Being sure it is right before being pleased it is fast
+
+None of those numbers were measured until the backend was shown to be correct, which took
+three separate checks, because the interesting failure is a fast renderer that is subtly
+wrong.
+
+**The furnace test ports directly, and is the sharpest of the three.** A fully reflective
+surface in a uniform environment must render as exactly that environment. It asserts a
+physical invariant rather than a stored number, so it transfers to a new backend without
+losing any force, and it needs no reference image that could be quietly re-baselined. The
+GPU renders it at 0.00% error for a diffuse surface and 0.01% for a rough conductor.
+
+**GPU output is deterministic.** The same seed gives a byte-identical image across runs.
+That is what makes anything else about it testable.
+
+**The two backends converge to the same image.** They cannot produce the same *pixels* —
+the CPU seeds per row and consumes that row's stream left to right, which threads running
+at once cannot reproduce, so the GPU seeds per pixel and carries different noise. What is
+asserted instead is that they differ from each other by no more than either differs from
+*itself* at another seed. Measured across six scenes that ratio sits between 0.99 and
+1.03, and both differences fall as the square root of the sample count, which is what
+unbiased estimators of the same integral do.
+
+That last test is deliberately narrow, and the narrowness was measured rather than
+assumed. Deleting direct light sampling from the device path takes the ratio to 9.1 and
+13.5, so gross divergence is caught by an order of magnitude. A *small* bias confined to
+part of the image is not: deleting the conductor energy compensation moves it only to
+1.03. A per-block version was tried to reach those, and it gave 2.6 for that real bias
+and 3.8 for a scene with none — in near-noiseless blocks it divides a tiny difference by a
+tinier noise floor — so it was dropped rather than tuned until it passed. Localized energy
+errors belong to the furnace test, which shows that same deleted compensation as a 44%
+error against a 2% tolerance.
 
 #### Traversal on the RT cores
 
@@ -217,6 +270,7 @@ watch; pass `--out` and it renders once to a file.
 | `--denoise [n]` | Filter noise using surface colour and normals as a guide (default 5 passes). Applies to both saved images and the viewer |
 | `--denoise-strength <v>` | How much radiance difference the filter blurs across (default 0.10) |
 | `--headless` | Render once and exit without opening a window |
+| `--device <cpu|gpu>` | Which backend renders (default cpu) |
 | `--gpu-info` | Report the GPU, OptiX and NVRTC this build can see, then exit |
 | `--help` | Full usage, including the viewer controls |
 
@@ -265,8 +319,9 @@ ctest --test-dir build --output-on-failure
 ```
 
 Twenty-two tests, about twenty-four seconds. Most of that is path tracing the two
-Stanford models; everything else finishes in around three. A GPU build adds eight
-more, comparing the shared maths and the traversal against the CPU.
+Stanford models; everything else finishes in around three. A GPU build adds sixteen
+more, covering the shared maths, the traversal, the furnace invariant on the device, and
+cross-backend agreement.
 
 ---
 
@@ -547,7 +602,7 @@ legitimately alter every pixel.
 
 ## How it is tested
 
-Twenty-two tests, running in about twenty-four seconds, plus eight more on a GPU build.
+Twenty-two tests, running in about twenty-four seconds, plus sixteen more on a GPU build.
 
 **Reference images.** Thirteen scenes rendered at a fixed seed and sample count, compared
 against committed references. Tolerances are tight, and were chosen by measuring what a

@@ -99,3 +99,19 @@ struct Surface
      */
     bool frontFace = true;
 };
+
+/**
+ * \brief A light that direct lighting samples explicitly.
+ *
+ * Spherical, because that is the shape the scene format already describes and a cone
+ * towards a centre and a radius is cheap to sample. Emissive geometry of other shapes
+ * still lights a scene through ordinary path tracing, just with more noise.
+ *
+ * Lives here rather than inside Scene because both backends sample from it.
+ */
+struct Emitter
+{
+    Vec3 center;
+    float radius = 0.0f;
+    Vec3 emission;
+};
