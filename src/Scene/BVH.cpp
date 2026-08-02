@@ -7,22 +7,22 @@
 #include <cmath>
 #include <iostream>
 
-BVH::BVH(const std::vector<std::shared_ptr<SceneObject>> &objectList, unsigned int objectsInLeaf)
-    : m_ObjectsInLeaf(std::max(1U, objectsInLeaf))
+BVH::BVH(Geometry &geometry, unsigned int objectsInLeaf)
+    : m_Geometry(&geometry), m_ObjectsInLeaf(std::max(1U, objectsInLeaf))
 {
-    std::cout << "Building BVH over " << objectList.size() << " primitives." << std::endl;
+    const uint32_t count = geometry.primitiveCount();
 
-    m_Primitives.reserve(objectList.size());
-    m_PrimBounds.reserve(objectList.size());
-    m_PrimCentroids.reserve(objectList.size());
+    std::cout << "Building BVH over " << count << " primitives." << std::endl;
 
-    for (const std::shared_ptr<SceneObject> &object : objectList)
+    m_Primitives.reserve(count);
+    m_PrimBounds.reserve(count);
+    m_PrimCentroids.reserve(count);
+
+    for (uint32_t primitive = 0; primitive < count; primitive++)
     {
-        AABB bounds;
-        bounds.expand(Vec3(object->getMinX(), object->getMinY(), object->getMinZ()));
-        bounds.expand(Vec3(object->getMaxX(), object->getMaxY(), object->getMaxZ()));
+        const AABB bounds = geometry.primitiveBounds(primitive);
 
-        m_Primitives.push_back(object.get());
+        m_Primitives.push_back(primitive);
         m_PrimBounds.push_back(bounds);
         m_PrimCentroids.push_back(bounds.centroid());
     }
@@ -36,6 +36,10 @@ BVH::BVH(const std::vector<std::shared_ptr<SceneObject>> &objectList, unsigned i
     m_Nodes.reserve((2 * m_Primitives.size()) + 1);
 
     buildNode(0, m_Primitives.size(), 0);
+
+    // With the tree built, its primitive order is known, so the geometry can be laid out
+    // to match it.
+    geometry.reorderPrimitives(m_Primitives);
 
     // The per-primitive caches are only needed during the build.
     m_PrimBounds.clear();
@@ -283,9 +287,9 @@ auto BVH::intersect(Ray ray) const -> Hit
                 {
                     Stats::countPrimitiveTest();
 
-                    const Hit hit = m_Primitives[node.rightOrFirst + i]->rayIntersect(ray);
+                    const Hit hit = m_Geometry->intersect(m_Primitives[node.rightOrFirst + i], ray);
 
-                    if (hit.isHit && hit.time < ray.tMax)
+                    if (hit.isHit() && hit.time < ray.tMax)
                     {
                         closest = hit;
 
@@ -359,7 +363,7 @@ auto BVH::isOccluded(const Ray &ray) const -> bool
 
                     // Any intersection blocks the light, so there is no reason to keep
                     // looking for the closest one.
-                    if (m_Primitives[node.rightOrFirst + i]->rayIntersect(ray).isHit)
+                    if (m_Geometry->intersect(m_Primitives[node.rightOrFirst + i], ray).isHit())
                     {
                         return true;
                     }

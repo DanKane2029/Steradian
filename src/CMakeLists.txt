@@ -9,8 +9,8 @@ add_library(pt_core STATIC
     RayTracer/Integrator.cpp
     RayTracer/RayTracer.cpp
     Scene/BVH.cpp
+    Scene/Geometry.cpp
     Scene/Scene.cpp
-    Scene/SceneObject.cpp
     Scene/Texture.cpp
     Utils/Config.cpp
     Utils/Denoiser.cpp

@@ -3,6 +3,7 @@
 #include <cmath>
 #include <exception>
 #include <iostream>
+#include <stdexcept>
 #include <unistd.h>
 
 #include "Utils/StringUtils.h"
@@ -22,7 +23,6 @@ ObjModel::ObjModel(std::string filePath) : material(Material("obj_material"))
 auto ObjModel::loadModel(std::string filePath) -> bool
 {
     std::vector<unsigned int> vertexIndices, uvIndices, normalIndices;
-    std::vector<SceneObject> objList;
 
     std::ifstream objFile(filePath.c_str(), std::ios::in);
     int lineCount = 0;
@@ -162,68 +162,116 @@ auto ObjModel::parseFace(std::vector<std::string> &faceIndices) -> std::vector<O
     return faces;
 }
 
-auto ObjModel::createTriangleFromFaceIndices(FaceIndices fi0, FaceIndices fi1, FaceIndices fi2) -> Triangle
+namespace
 {
-    // fi1 is included in each of these. It was previously omitted (fi0 was tested twice),
-    // so a face with a missing middle index passed validation and then indexed the vertex
-    // list out of bounds.
-    const bool positionsSet = fi0.positionSet && fi1.positionSet && fi2.positionSet;
-    const bool normalsSet = fi0.normalSet && fi1.normalSet && fi2.normalSet;
-    const bool textureSet = fi0.textureSet && fi1.textureSet && fi2.textureSet;
 
-    if (!positionsSet)
+/**
+ * resolves an .obj index against a list
+ *
+ * Indices are 1-based, and negative values refer back from the end of the list.
+ */
+auto resolveIndex(int index, size_t count) -> uint32_t
+{
+    const long long resolved = (index < 0) ? static_cast<long long>(count) + index : index - 1;
+
+    if (resolved < 0 || resolved >= static_cast<long long>(count))
     {
-        throw std::runtime_error("OBJ face is missing vertex position indices");
+        throw std::runtime_error("OBJ index " + std::to_string(index) + " is out of range (list holds " +
+                                 std::to_string(count) + ")");
     }
 
-    // OBJ indices are 1-based, and negative values refer back from the end of the list.
-    const auto resolve = [](int index, size_t count) -> size_t {
-        const long long resolved = (index < 0) ? static_cast<long long>(count) + index : index - 1;
-
-        if (resolved < 0 || resolved >= static_cast<long long>(count))
-        {
-            throw std::runtime_error("OBJ index " + std::to_string(index) + " is out of range (list holds " +
-                                     std::to_string(count) + ")");
-        }
-
-        return static_cast<size_t>(resolved);
-    };
-
-    const size_t p0 = resolve(fi0.position, m_vertexList.size());
-    const size_t p1 = resolve(fi1.position, m_vertexList.size());
-    const size_t p2 = resolve(fi2.position, m_vertexList.size());
-
-    Triangle tri;
-
-    if (normalsSet)
-    {
-        tri = Triangle(m_vertexList[p0], m_normalList[resolve(fi0.normal, m_normalList.size())], m_vertexList[p1],
-                       m_normalList[resolve(fi1.normal, m_normalList.size())], m_vertexList[p2],
-                       m_normalList[resolve(fi2.normal, m_normalList.size())]);
-    }
-    else
-    {
-        tri = Triangle(m_vertexList[p0], m_vertexList[p1], m_vertexList[p2]);
-    }
-
-    if (textureSet && !m_textureCoordList.empty())
-    {
-        tri.setTextureCoords(m_textureCoordList[resolve(fi0.texture, m_textureCoordList.size())],
-                             m_textureCoordList[resolve(fi1.texture, m_textureCoordList.size())],
-                             m_textureCoordList[resolve(fi2.texture, m_textureCoordList.size())]);
-    }
-
-    return tri;
+    return static_cast<uint32_t>(resolved);
 }
 
-auto ObjModel::getSceneObjects() -> std::vector<std::shared_ptr<SceneObject>>
-{
-    std::vector<std::shared_ptr<SceneObject>> sceneObjectList;
+} // namespace
 
-    for (const std::vector<ObjModel::FaceIndices> &faceIndices : m_faceIndicesList)
+auto ObjModel::resolveVertex(const FaceIndices &corner, bool useNormal, bool useTexture, Geometry &geometry,
+                             VertexCache &cache) -> uint32_t
+{
+    VertexKey key;
+    key.position = resolveIndex(static_cast<int>(corner.position), m_vertexList.size());
+
+    if (useNormal)
     {
-        // A face needs at least three vertices. Previously anything not larger than three
-        // was assumed to be exactly three and indexed directly, so a malformed two-vertex
+        key.normal = resolveIndex(static_cast<int>(corner.normal), m_normalList.size());
+    }
+
+    if (useTexture)
+    {
+        key.texture = resolveIndex(static_cast<int>(corner.texture), m_textureCoordList.size());
+    }
+
+    const auto existing = cache.find(key);
+    if (existing != cache.end())
+    {
+        return existing->second;
+    }
+
+    // A vertex with no normal is stored with a zero one, which makes interpolation fall
+    // back to the triangle's own plane. Absent texture coordinates likewise store zero,
+    // and interpolate to zero, which is what an untextured triangle reported before.
+    const Vec3 normal = useNormal ? m_normalList[key.normal] : Vec3();
+    const Vec3 texCoord = useTexture ? m_textureCoordList[key.texture] : Vec3();
+
+    const uint32_t index = geometry.addVertex(m_vertexList[key.position], normal, texCoord);
+    cache.emplace(key, index);
+
+    return index;
+}
+
+/**
+ * splits an n-gon into a triangle fan around its first vertex
+ *
+ * An n-gon yields n-2 triangles. The loop bound was once size-2, which produced n-3 and
+ * so dropped the last triangle of every face: a quad became a single triangle, leaving
+ * half of every quad mesh missing.
+ */
+void ObjModel::appendFace(const std::vector<FaceIndices> &faceIndices, Geometry &geometry, VertexCache &cache,
+                          uint32_t materialIndex)
+{
+    for (size_t i = 1; i + 1 < faceIndices.size(); i++)
+    {
+        const FaceIndices &corner0 = faceIndices[0];
+        const FaceIndices &corner1 = faceIndices[i];
+        const FaceIndices &corner2 = faceIndices[i + 1];
+
+        // All three corners are checked. fi1 was once omitted (the first was tested
+        // twice), so a face with a missing middle index passed validation and then
+        // indexed the vertex list out of bounds.
+        if (!corner0.positionSet || !corner1.positionSet || !corner2.positionSet)
+        {
+            throw std::runtime_error("OBJ face is missing vertex position indices");
+        }
+
+        // Normals and texture coordinates are all-or-nothing per triangle: interpolating
+        // between a supplied normal and a missing one has no meaning.
+        const bool useNormal = corner0.normalSet && corner1.normalSet && corner2.normalSet;
+        const bool useTexture =
+            corner0.textureSet && corner1.textureSet && corner2.textureSet && !m_textureCoordList.empty();
+
+        // Resolved one at a time, and in order, because each call may append a vertex.
+        // As arguments to one call the order would be unspecified, and the vertex buffer
+        // would come out laid out differently from one compiler to the next.
+        const uint32_t vertex0 = resolveVertex(corner0, useNormal, useTexture, geometry, cache);
+        const uint32_t vertex1 = resolveVertex(corner1, useNormal, useTexture, geometry, cache);
+        const uint32_t vertex2 = resolveVertex(corner2, useNormal, useTexture, geometry, cache);
+
+        geometry.addTriangle(vertex0, vertex1, vertex2, materialIndex);
+    }
+}
+
+void ObjModel::appendTo(Geometry &geometry, uint32_t materialIndex)
+{
+    VertexCache cache;
+    cache.reserve(m_vertexList.size() * 2);
+
+    geometry.reserveVertices(m_vertexList.size());
+    geometry.reserveTriangles(m_faceIndicesList.size());
+
+    for (const std::vector<FaceIndices> &faceIndices : m_faceIndicesList)
+    {
+        // A face needs at least three vertices. Anything not larger than three was once
+        // assumed to be exactly three and indexed directly, so a malformed two-vertex
         // face read out of bounds.
         if (faceIndices.size() < 3)
         {
@@ -231,34 +279,8 @@ auto ObjModel::getSceneObjects() -> std::vector<std::shared_ptr<SceneObject>>
             continue;
         }
 
-        for (Triangle &tri : triangulateFace(faceIndices))
-        {
-            sceneObjectList.push_back(std::make_shared<Triangle>(tri));
-        }
+        appendFace(faceIndices, geometry, cache, materialIndex);
     }
-
-    return sceneObjectList;
-}
-
-/**
- * splits an n-gon into a triangle fan around its first vertex
- *
- * An n-gon yields n-2 triangles. The loop bound was previously size-2, which produced
- * n-3 and so dropped the last triangle of every face: a quad became a single triangle,
- * leaving half of every quad mesh missing.
- */
-auto ObjModel::triangulateFace(std::vector<ObjModel::FaceIndices> faceIndices) -> std::vector<Triangle>
-{
-    const FaceIndices start = faceIndices[0];
-    std::vector<Triangle> triList;
-    triList.reserve(faceIndices.size() - 2);
-
-    for (size_t i = 1; i + 1 < faceIndices.size(); i++)
-    {
-        triList.emplace_back(createTriangleFromFaceIndices(start, faceIndices[i], faceIndices[i + 1]));
-    }
-
-    return triList;
 }
 
 auto ObjModel::getCenterPoint() -> Vec3

@@ -1,13 +1,12 @@
 #pragma once
 
 #include <cstdint>
-#include <memory>
 #include <vector>
 
 #include "AABB.h"
+#include "Geometry.h"
 #include "RayTracer/Hit.h"
 #include "RayTracer/Ray.h"
-#include "SceneObject.h"
 
 /**
  * \brief A node in the flattened bounding volume hierarchy.
@@ -53,21 +52,28 @@ class BVH
 {
   public:
     /**
-     * \brief Builds a hierarchy over a list of scene objects.
+     * \brief Builds a hierarchy over a scene's primitives.
      *
-     * The BVH stores raw pointers to objects that remain owned by the Scene, so it must
-     * be rebuilt if the scene's object list changes.
+     * The geometry stays owned by the Scene and is referred to by index, so the hierarchy
+     * must be rebuilt if it changes.
      *
-     * \param objectList The primitives to organize.
+     * Building also lays the geometry out: once the tree is known, the primitives and
+     * their vertices are renumbered into the order traversal reads them. Layout is part
+     * of the build because only the build knows what that order is, and the difference it
+     * makes is large enough not to leave to a caller to remember. It changes no
+     * intersection result -- the same primitives are tested in the same sequence, under
+     * different numbers.
+     *
+     * \param geometry The primitives to organize, reordered in place.
      * \param objectsInLeaf Maximum primitives per leaf.
      */
-    explicit BVH(const std::vector<std::shared_ptr<SceneObject>> &objectList, unsigned int objectsInLeaf = 2);
+    explicit BVH(Geometry &geometry, unsigned int objectsInLeaf = 2);
 
     /**
      * \brief Finds the closest intersection along a ray.
      *
      * \param ray The ray, whose tMin and tMax bound the search.
-     * \returns The closest hit, or a Hit with isHit false.
+     * \returns The closest hit, or a Hit whose isHit() is false.
      */
     auto intersect(Ray ray) const -> Hit;
 
@@ -128,8 +134,15 @@ class BVH
 
     std::vector<BVHNode> m_Nodes;
 
-    /** primitives in traversal order; leaves index contiguous ranges of this */
-    std::vector<SceneObject *> m_Primitives;
+    const Geometry *m_Geometry = nullptr;
+
+    /**
+     * \brief Primitive indices in traversal order; leaves cover contiguous ranges of it.
+     *
+     * An index rather than a pointer, so a leaf's primitives are four bytes each and the
+     * intersection call that follows is a direct one.
+     */
+    std::vector<uint32_t> m_Primitives;
 
     /** cached per-primitive bounds and centroids, used only while building */
     std::vector<AABB> m_PrimBounds;
