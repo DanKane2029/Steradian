@@ -2,7 +2,6 @@
 
 #include "Utils/Random.h"
 
-#include <array>
 #include <vector>
 
 namespace Microfacet
@@ -11,7 +10,6 @@ namespace Microfacet
 namespace
 {
 
-constexpr int albedoResolution = 32;
 constexpr int albedoSamples = 2048;
 
 /**
@@ -71,33 +69,13 @@ auto buildAlbedoTable() -> std::vector<float>
 
 } // namespace
 
-auto directionalAlbedo(float cosThetaO, float roughness) -> float
+auto hostAlbedoTable() -> const float *
 {
-    // Built once, on first use. Costs a few million samples of the routine above, which is
-    // milliseconds, and saves repeating that work for every shading point.
+    // Built once, on first use. Costs a few million samples of the routines above, which
+    // is milliseconds, and saves repeating that work for every shading point.
     static const std::vector<float> table = buildAlbedoTable();
 
-    const float r = std::clamp(roughness, 0.0f, 1.0f) * albedoResolution - 0.5f;
-    const float c = std::clamp(cosThetaO, 0.0f, 1.0f) * albedoResolution - 0.5f;
-
-    const int r0 = std::clamp(static_cast<int>(std::floor(r)), 0, albedoResolution - 1);
-    const int c0 = std::clamp(static_cast<int>(std::floor(c)), 0, albedoResolution - 1);
-    const int r1 = std::min(r0 + 1, albedoResolution - 1);
-    const int c1 = std::min(c0 + 1, albedoResolution - 1);
-
-    const float fr = std::clamp(r - static_cast<float>(r0), 0.0f, 1.0f);
-    const float fc = std::clamp(c - static_cast<float>(c0), 0.0f, 1.0f);
-
-    const float a = table[(r0 * albedoResolution) + c0];
-    const float b = table[(r0 * albedoResolution) + c1];
-    const float d = table[(r1 * albedoResolution) + c0];
-    const float e = table[(r1 * albedoResolution) + c1];
-
-    const float top = a + ((b - a) * fc);
-    const float bottom = d + ((e - d) * fc);
-
-    // Never report zero: the caller divides by this.
-    return std::max(top + ((bottom - top) * fr), 1e-3f);
+    return table.data();
 }
 
 } // namespace Microfacet

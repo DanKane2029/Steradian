@@ -67,10 +67,13 @@ jobs:
       - name: Configure
         run: |
           cmake -B build -DCMAKE_BUILD_TYPE=Release \
-            -DPT_BUILD_VIEWER=OFF -DPT_BUILD_TESTS=OFF -DPT_ENABLE_GPU=ON 2>&1 | tee configure.log
+            -DPT_BUILD_VIEWER=OFF -DPT_BUILD_TESTS=ON -DPT_ENABLE_GPU=ON 2>&1 | tee configure.log
           grep -q 'gpu         = ON' configure.log \
             || { echo "::error::GPU support was not enabled; its dependencies are missing"; exit 1; }
 
+      # Tests are built but not run: device_parity needs a GPU to run and only a
+      # compiler to be kept honest, and building it is what stops the device side of the
+      # shared maths from rotting between GPU sessions.
       - name: Build
         run: cmake --build build -j$(nproc)
 
