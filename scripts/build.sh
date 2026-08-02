@@ -11,6 +11,7 @@
 #   scripts/build.sh --clean --test  ...from scratch
 #   scripts/build.sh --debug         a debug build, in build-debug
 #   scripts/build.sh --no-viewer     headless only, in build-headless
+#   scripts/build.sh --gpu           with GPU support, in build-gpu
 #
 # Runs from anywhere: paths are resolved relative to this script.
 set -euo pipefail
@@ -23,6 +24,7 @@ BUILD_DIR=""
 RUN_TESTS=0
 CLEAN=0
 VIEWER=1
+GPU=0
 JOBS="$(nproc 2>/dev/null || echo 4)"
 
 while [ $# -gt 0 ]; do
@@ -32,6 +34,7 @@ while [ $# -gt 0 ]; do
         --debug)      BUILD_TYPE="Debug" ;;
         --release)    BUILD_TYPE="Release" ;;
         --no-viewer)  VIEWER=0 ;;
+        --gpu)        GPU=1 ;;
         --jobs)       shift; JOBS="$1" ;;
         --dir)        shift; BUILD_DIR="$1" ;;
         -h|--help)    sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; exit 0 ;;
@@ -50,6 +53,7 @@ if [ -z "$BUILD_DIR" ]; then
     BUILD_DIR="build"
     [ "$BUILD_TYPE" = "Debug" ] && BUILD_DIR="${BUILD_DIR}-debug"
     [ "$VIEWER" -eq 0 ] && BUILD_DIR="${BUILD_DIR}-headless"
+    [ "$GPU" -eq 1 ] && BUILD_DIR="${BUILD_DIR}-gpu"
 fi
 
 # The renderer will not build at all without the JSON headers, and a clone made without
@@ -77,6 +81,18 @@ else
         CMAKE_ARGS+=(-DCMAKE_PREFIX_PATH="$SYSROOT/usr")
         CMAKE_ARGS+=(-DCMAKE_LIBRARY_PATH="$SYSROOT/usr/lib/x86_64-linux-gnu")
     fi
+fi
+
+if [ "$GPU" -eq 1 ]; then
+    # The GPU SDK is fetched rather than tracked, so a first --gpu build on a fresh clone
+    # would otherwise configure, warn, and quietly produce a binary without the feature
+    # that was just asked for.
+    if [ ! -f third_party/gpu/include/cuda.h ]; then
+        echo "Fetching the CUDA and OptiX headers..."
+        scripts/setup-gpu-deps.sh >/dev/null
+    fi
+
+    CMAKE_ARGS+=(-DPT_ENABLE_GPU=ON)
 fi
 
 if [ "$CLEAN" -eq 1 ]; then

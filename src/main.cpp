@@ -13,6 +13,10 @@
 #include "Window/Window.h"
 #endif
 
+#ifdef PT_HAVE_GPU
+#include "Gpu/DeviceInfo.h"
+#endif
+
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
@@ -43,6 +47,7 @@ struct Options
 
     bool headless = false;
     bool showHelp = false;
+    bool showGpuInfo = false;
 };
 
 void printUsage(const char *program)
@@ -70,6 +75,9 @@ void printUsage(const char *program)
               << "                     --samples then sets the maximum rather than the count\n"
               << "  --headless         Render once and exit without opening a window.\n"
               << "                     Combine with --out to save the result\n"
+              << "  --gpu-info         Report the GPU, OptiX and NVRTC this build can see,\n"
+              << "                     then exit. Needs a build configured with\n"
+              << "                     -DPT_ENABLE_GPU=ON\n"
               << "  --help             Show this message\n"
               << "\n"
               << "Passing --out implies --headless. The two positional arguments are kept\n"
@@ -119,6 +127,10 @@ auto parseArgs(int argc, char *argv[]) -> Options
         if (arg == "--help" || arg == "-h")
         {
             options.showHelp = true;
+        }
+        else if (arg == "--gpu-info")
+        {
+            options.showGpuInfo = true;
         }
         else if (arg == "--headless")
         {
@@ -244,6 +256,20 @@ auto main(int argc, char *argv[]) -> int
         {
             printUsage(argv[0]);
             return EXIT_SUCCESS;
+        }
+
+        // Answered before the config and scene are required, since it is a question
+        // about the machine rather than about a render.
+        if (options.showGpuInfo)
+        {
+#ifdef PT_HAVE_GPU
+            return Gpu::printDeviceInfo() ? EXIT_SUCCESS : EXIT_FAILURE;
+#else
+            std::cerr << "This build has no GPU support.\n"
+                      << "Fetch the headers with scripts/setup-gpu-deps.sh, then configure\n"
+                      << "with -DPT_ENABLE_GPU=ON.\n";
+            return EXIT_FAILURE;
+#endif
         }
 
         if (options.configPath.empty() || options.scenePath.empty())

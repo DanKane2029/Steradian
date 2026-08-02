@@ -45,6 +45,49 @@ jobs:
             tests/golden/*.png
           if-no-files-found: ignore
 
+  gpu:
+    name: Build GPU support
+    runs-on: ubuntu-latest
+
+    # There is no NVIDIA GPU on a hosted runner, so this cannot run anything. It compiles
+    # and links, which is the part that rots silently: without it, no GPU code would ever
+    # be built by CI at all. Linking works without a driver because the build links the
+    # CUDA stub library, which exports the driver API entry points and resolves against
+    # the real driver only at run time.
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Fetch the CUDA and OptiX headers
+        run: scripts/setup-gpu-deps.sh
+
+      # As elsewhere, a missing dependency downgrades to a build without the feature
+      # rather than failing, which would let this job pass without compiling any of it.
+      - name: Configure
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release \
+            -DPT_BUILD_VIEWER=OFF -DPT_BUILD_TESTS=OFF -DPT_ENABLE_GPU=ON 2>&1 | tee configure.log
+          grep -q 'gpu         = ON' configure.log \
+            || { echo "::error::GPU support was not enabled; its dependencies are missing"; exit 1; }
+
+      - name: Build
+        run: cmake --build build -j$(nproc)
+
+      # The binary cannot be run here. It links libcuda.so.1, which ships with the
+      # display driver and so does not exist on a hosted runner -- the stub satisfies the
+      # linker, not the loader, because the loader searches by file name and the stub is
+      # called libcuda.so. So assert the link instead: that the driver API and NVRTC are
+      # both recorded as dependencies, which is what would break if the GPU target were
+      # silently built without them.
+      - name: Check what it linked against
+        run: |
+          readelf -d build/src/steradian | tee needed.log
+          grep -q 'libcuda\.so\.1' needed.log \
+            || { echo "::error::the binary does not depend on the CUDA driver API"; exit 1; }
+          grep -q 'libnvrtc\.so' needed.log \
+            || { echo "::error::the binary does not depend on NVRTC"; exit 1; }
+
   viewer:
     name: Build viewer
     runs-on: ubuntu-latest

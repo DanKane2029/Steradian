@@ -36,5 +36,10 @@ compile_commands.json
 # agent worktrees
 .claude/
 
-# NOTE: third_party/ is deliberately NOT ignored. Both dependencies are tracked git
+# NOTE: third_party/ is deliberately NOT ignored. json and glfw are tracked git
 # submodules, and ignoring a submodule path stops git from seeing the gitlink.
+#
+# The GPU SDK is the exception: it is fetched by scripts/setup-gpu-deps.sh rather than
+# tracked, because it is 62 MB of NVIDIA headers and libraries under their own licences,
+# and because only a build with -DPT_ENABLE_GPU=ON needs it at all.
+third_party/gpu/
