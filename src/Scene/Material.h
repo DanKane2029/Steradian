@@ -1,9 +1,8 @@
 #pragma once
 #include <cmath>
-#include <string>
-#include <utility>
+#include <cstdint>
+#include <type_traits>
 
-#include "Scene/Texture.h"
 #include "Utils/Vec3.h"
 
 /**
@@ -16,6 +15,15 @@
  *
  * Scenes written against the old fields still load: see Scene.cpp, which maps them onto
  * these.
+ *
+ * Deliberately a plain aggregate of numbers: no name, no owned texture, nothing that
+ * allocates. A material is read once per shade from an array indexed by the primitive
+ * that was hit, and it has to be something an array of which can be copied to a device
+ * as bytes. The static assertion below is there so that stays true -- adding a
+ * std::string or a container here would break the build rather than the port.
+ *
+ * Its name lives in the scene's name-to-index map, which is load-time only, and its
+ * texture in the scene's texture array; see Scene::albedoAt.
  */
 struct Material
 {
@@ -26,8 +34,6 @@ struct Material
         Metal,     ///< specular reflection tinted by albedo, blurred by roughness
         Dielectric ///< glass: refracts, with Fresnel-weighted reflection
     };
-
-    std::string name;
 
     /** proportion of light reflected per channel; for metals, the tint of the reflection */
     Vec3 albedo{0.8f, 0.8f, 0.8f};
@@ -58,8 +64,8 @@ struct Material
      */
     Vec3 absorption{};
 
-    /** optional albedo texture, sampled with the surface's texture coordinates */
-    Texture texture;
+    /** index into the scene's texture array, or -1 for an untextured material */
+    int32_t textureIndex = -1;
 
     /**
      * \brief The second colour of a procedural checker, and the size of one square.
@@ -81,12 +87,6 @@ struct Material
         return checkerScale > 0.0f;
     }
 
-    Material() = default;
-
-    explicit Material(std::string name) : name(std::move(name))
-    {
-    }
-
     /** true when this surface emits light and should be sampled as an emitter */
     auto isEmissive() const -> bool
     {
@@ -94,21 +94,17 @@ struct Material
     }
 
     /**
-     * \brief The albedo at a point, taking any checker or texture into account.
+     * \brief The surface colour at a point, before any texture is applied.
      *
-     * \param texCoord Surface texture coordinates; only x and y are used.
+     * Texturing is applied by Scene::albedoAt, which is where the texture array lives.
+     * Keeping it out of here is what lets this type stay free of anything that owns
+     * memory.
+     *
      * \param position Where the point is in the world, for the procedural checker.
      */
-    auto albedoAt(const Vec3 &texCoord, const Vec3 &position) const -> Vec3
+    auto baseAlbedo(const Vec3 &position) const -> Vec3
     {
-        const Vec3 base = hasChecker() ? checkerAt(position) : albedo;
-
-        if (!texture.isValid())
-        {
-            return base;
-        }
-
-        return base * texture.getTexel(texCoord.x, texCoord.y);
+        return hasChecker() ? checkerAt(position) : albedo;
     }
 
   private:
@@ -131,3 +127,7 @@ struct Material
         return parity == 0 ? albedo : checkerAlbedo;
     }
 };
+
+// The whole point of the type. If this ever fails, something that owns memory has been
+// added to a material, and an array of them can no longer be handed to a device.
+static_assert(std::is_trivially_copyable_v<Material>, "Material must stay copyable as bytes");

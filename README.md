@@ -145,6 +145,7 @@ movement speed.
 | `glass_lens` | Refraction: a glass sphere inverts the scene behind it |
 | `glass_tinted` | Absorption: clear, tinted and deeply coloured glass |
 | `two_spheres` | A diffuse and a metal sphere under a sky |
+| `textured_spheres` | Two spheres sharing one image texture, tinted differently |
 | `single_sphere`, `single_triangle` | Minimal scenes |
 | `test_obj_ball` | A 960 triangle mesh |
 | `test_man_obj` | A 48,918 triangle mesh |
@@ -158,8 +159,8 @@ movement speed.
 ctest --test-dir build --output-on-failure
 ```
 
-Eighteen tests, about seventeen seconds. Most of that is path tracing the two Stanford
-models; everything else finishes in around three.
+Twenty-two tests, about twenty-four seconds. Most of that is path tracing the two
+Stanford models; everything else finishes in around three.
 
 ---
 
@@ -339,6 +340,12 @@ The result, at 400×320 and 32 samples per pixel, against the polymorphic versio
 | `bunny` | 24.88 s → **24.70 s** | 32.8 MB → **23.8 MB** |
 | `dragon` | 16.11 s → **16.00 s** | 77.0 MB → **52.3 MB** |
 
+Materials went the same way, from 136 bytes to 68. A material no longer carries its own
+name or owns its own texture — the name lives in the scene's load-time lookup table and
+the texture in a shared array the material indexes into, so two materials naming the same
+file load it once. What is left is a block of numbers, and a static assertion keeps it
+that way: adding anything that owns memory breaks the build rather than the eventual port.
+
 The honest reading is that the memory win is the large one, and the time win is
 concentrated where per-test overhead dominates. On the heavy meshes it is barely more than
 noise, and the counters say why: the dragon spends 658 node visits per ray against 87.5
@@ -434,9 +441,9 @@ legitimately alter every pixel.
 
 ## How it is tested
 
-Twenty-one tests, running in about fifty seconds.
+Twenty-two tests, running in about twenty-four seconds.
 
-**Reference images.** Twelve scenes rendered at a fixed seed and sample count, compared
+**Reference images.** Thirteen scenes rendered at a fixed seed and sample count, compared
 against committed references. Tolerances are tight, and were chosen by measuring what a
 deliberately introduced 2% brightness error actually looks like rather than by picking a
 number that felt safe.

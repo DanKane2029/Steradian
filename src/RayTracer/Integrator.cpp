@@ -265,7 +265,7 @@ auto Integrator::radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) c
         const Surface surface = m_Scene->getGeometry().surfaceAt(ray, hit);
 
         const Material &material = m_Scene->getMaterialByIndex(surface.materialIndex);
-        const Vec3 albedo = material.albedoAt(surface.textureCoord, surface.position);
+        const Vec3 albedo = m_Scene->albedoAt(material, surface.textureCoord, surface.position);
 
         if (!recordedFirstHit)
         {

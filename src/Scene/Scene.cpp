@@ -90,12 +90,34 @@ auto parseTransform(const json &object) -> Transform
 /**
  * registers a material and returns the index used to refer to it
  */
-auto Scene::registerMaterial(const Material &material) -> uint32_t
+auto Scene::registerMaterial(const Material &material, const std::string &name) -> uint32_t
 {
     const auto index = static_cast<uint32_t>(m_Materials.size());
 
     m_Materials.push_back(material);
-    m_MaterialIndices[material.name] = index;
+    m_MaterialIndices[name] = index;
+
+    return index;
+}
+
+/**
+ * loads a texture, or returns the index of one already loaded from the same file
+ *
+ * A texture that fails to load is still registered, as an empty one, which is what makes
+ * a scene with a bad texture path render untextured rather than not at all.
+ */
+auto Scene::registerTexture(const std::string &path) -> int32_t
+{
+    const auto existing = m_TextureIndices.find(path);
+    if (existing != m_TextureIndices.end())
+    {
+        return existing->second;
+    }
+
+    const auto index = static_cast<int32_t>(m_Textures.size());
+
+    m_Textures.emplace_back(path);
+    m_TextureIndices[path] = index;
 
     return index;
 }
@@ -172,7 +194,7 @@ Scene::Scene(std::string filePath)
         const std::string name = it.key();
         const json &materialData = it.value();
 
-        Material material(name);
+        Material material;
 
         // New-style fields describe scattering directly. Older scenes describe
         // Blinn-Phong shading instead, so those fields are mapped onto the closest
@@ -237,7 +259,7 @@ Scene::Scene(std::string filePath)
 
         if (materialData.contains("texture"))
         {
-            material.texture = Texture(resolveAssetPath(materialData.at("texture"), sceneDir));
+            material.textureIndex = registerTexture(resolveAssetPath(materialData.at("texture"), sceneDir));
         }
 
         if (materialData.contains("checker"))
@@ -251,7 +273,7 @@ Scene::Scene(std::string filePath)
             material.checkerScale = optionalFloat(checker, "scale", 1.0f);
         }
 
-        registerMaterial(material);
+        registerMaterial(material, name);
     }
 
     std::vector<json> objectList = data.at(m_keywords.objects);
@@ -356,11 +378,12 @@ Scene::Scene(std::string filePath)
             const float area = 4.0f * static_cast<float>(M_PI) * radius * radius;
             const Vec3 emission = color * (intensity / area);
 
-            Material lightMaterial("__light_" + std::to_string(m_Emitters.size()));
+            Material lightMaterial;
             lightMaterial.emissive = emission;
             lightMaterial.albedo = Vec3(0.0f, 0.0f, 0.0f);
 
-            const uint32_t materialIndex = registerMaterial(lightMaterial);
+            const uint32_t materialIndex =
+                registerMaterial(lightMaterial, "__light_" + std::to_string(m_Emitters.size()));
 
             const uint32_t sphereIndex = m_Geometry.addSphere(pos, radius, materialIndex);
             m_Geometry.setSphereEmitter(sphereIndex, static_cast<int32_t>(m_Emitters.size()));

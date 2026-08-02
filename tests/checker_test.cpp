@@ -44,7 +44,7 @@ auto sameColour(const Vec3 &a, const Vec3 &b) -> bool
 
 auto floorMaterial(float squareSize) -> Material
 {
-    Material m("floor");
+    Material m;
     m.albedo = Vec3(0.8f, 0.8f, 0.8f);
     m.checkerAlbedo = Vec3(0.1f, 0.1f, 0.1f);
     m.checkerScale = squareSize;
@@ -72,9 +72,9 @@ void checkPlaneIsStable(float squareSize, float height, const char *what)
         const float x = static_cast<float>(i) * squareSize * 0.5f;
         const float z = static_cast<float>(i) * squareSize * 0.25f;
 
-        const Vec3 exact = m.albedoAt(uv, Vec3(x, height, z));
-        const Vec3 above = m.albedoAt(uv, Vec3(x, height + 1e-6f, z));
-        const Vec3 below = m.albedoAt(uv, Vec3(x, height - 1e-6f, z));
+        const Vec3 exact = m.baseAlbedo(Vec3(x, height, z));
+        const Vec3 above = m.baseAlbedo(Vec3(x, height + 1e-6f, z));
+        const Vec3 below = m.baseAlbedo(Vec3(x, height - 1e-6f, z));
 
         stable = stable && sameColour(exact, above) && sameColour(exact, below);
     }
@@ -102,10 +102,10 @@ int main()
 
         // Neighbouring squares must actually differ, or the checks above would pass on a
         // material that had quietly stopped drawing a checker at all.
-        const Vec3 here = m.albedoAt(uv, Vec3(0.0f, 0.0f, 0.0f));
-        const Vec3 next = m.albedoAt(uv, Vec3(0.5f, 0.0f, 0.0f));
-        const Vec3 acrossZ = m.albedoAt(uv, Vec3(0.0f, 0.0f, 0.5f));
-        const Vec3 diagonal = m.albedoAt(uv, Vec3(0.5f, 0.0f, 0.5f));
+        const Vec3 here = m.baseAlbedo(Vec3(0.0f, 0.0f, 0.0f));
+        const Vec3 next = m.baseAlbedo(Vec3(0.5f, 0.0f, 0.0f));
+        const Vec3 acrossZ = m.baseAlbedo(Vec3(0.0f, 0.0f, 0.5f));
+        const Vec3 diagonal = m.baseAlbedo(Vec3(0.5f, 0.0f, 0.5f));
 
         check(!sameColour(here, next), "the next square along x is the other colour");
         check(!sameColour(here, acrossZ), "the next square along z is the other colour");
@@ -114,10 +114,10 @@ int main()
 
     {
         // A material with no checker must be untouched by any of this.
-        Material plain("plain");
+        Material plain;
         plain.albedo = Vec3(0.3f, 0.6f, 0.9f);
 
-        check(sameColour(plain.albedoAt(Vec3{}, Vec3(1.7f, 0.0f, -2.3f)), plain.albedo),
+        check(sameColour(plain.baseAlbedo(Vec3(1.7f, 0.0f, -2.3f)), plain.albedo),
               "a material without a checker keeps its flat albedo");
     }
 

@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "Scene/Geometry.h"
-#include "Scene/Material.h"
 #include "Utils/Vec3.h"
 
 class ObjModel
@@ -29,7 +28,6 @@ class ObjModel
     std::vector<Vec3> m_vertexList{};
     std::vector<Vec3> m_normalList{};
     std::vector<Vec3> m_textureCoordList{};
-    Material material{"default_obj_material_name"};
 
     struct FaceIndices
     {
