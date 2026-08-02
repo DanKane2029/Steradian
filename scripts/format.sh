@@ -10,7 +10,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="${1:-$REPO_ROOT/build}"
 
 mapfile -t FILES < <(
-    find "$REPO_ROOT/src" \( -name '*.h' -o -name '*.cpp' \) \
+    find "$REPO_ROOT/src" \( -name '*.h' -o -name '*.cpp' -o -name '*.cu' \) \
         -not -name 'stb_image.h' \
         -not -name 'stb_image_write.h' \
         | sort

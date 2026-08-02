@@ -76,9 +76,13 @@ echo "Installing into $DEST ..."
 rm -rf "$DEST"
 mkdir -p "$DEST/include" "$DEST/lib/stubs"
 
-# Only what is actually compiled against. The cudart component carries the whole runtime
-# API as well, and none of it is used: this project talks to the driver API directly.
-cp "$CUDART_DIR/include/cuda.h" "$DEST/include/"
+# The whole of cudart's include directory, not a hand-picked subset.
+#
+# The obvious economy is to take just cuda.h and be done, since this project talks to the
+# driver API and uses none of the runtime. It does not survive contact: OptiX 9.1's device
+# headers include cuda_fp16.h, which drags in its own companions, and every attempt to
+# name the closure by hand is one header short of working. It is about 3 MB either way.
+cp -r "$CUDART_DIR/include/." "$DEST/include/"
 cp "$NVRTC_DIR/include/nvrtc.h" "$DEST/include/"
 cp -r "$OPTIX_DIR/include/." "$DEST/include/"
 
