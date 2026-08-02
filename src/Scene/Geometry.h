@@ -164,6 +164,16 @@ class Geometry
         return m_Positions;
     }
 
+    auto getNormals() const -> const std::vector<Vec3> &
+    {
+        return m_Normals;
+    }
+
+    auto getTexCoords() const -> const std::vector<Vec3> &
+    {
+        return m_TexCoords;
+    }
+
   private:
     /**
      * \brief Moller-Trumbore, without the surface attributes.

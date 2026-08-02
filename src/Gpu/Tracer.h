@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "Gpu/DeviceTypes.h"
-#include "Scene/Geometry.h"
+#include "Scene/Scene.h"
 #include "Utils/Vec3.h"
 
 namespace Gpu
@@ -39,11 +39,11 @@ class Tracer
      * reason -- no device, a driver too old, a kernel that would not compile -- and those
      * want reporting rather than unwinding.
      *
-     * \param geometry The scene, as laid out by Stage 1. Not retained.
+     * \param scene The scene. Copied to the device; not retained.
      * \param error Set to a description when the result is null.
      * \returns A usable tracer, or null.
      */
-    static auto create(const Geometry &geometry, std::string &error) -> std::unique_ptr<Tracer>;
+    static auto create(const Scene &scene, std::string &error) -> std::unique_ptr<Tracer>;
 
     ~Tracer();
 
@@ -66,6 +66,28 @@ class Tracer
      */
     auto trace(const std::vector<Vec3> &origins, const std::vector<Vec3> &directions, float tMin, float tMax,
                std::vector<DeviceHit> &hits) -> bool;
+
+    /**
+     * \brief Renders the whole image.
+     *
+     * One thread per pixel, each taking every sample for it, so the result does not
+     * depend on how the launch was divided up. It will not match the CPU pixel for pixel
+     * and is not meant to: the two backends seed their generators differently, because
+     * the CPU's per-row stream cannot be reproduced by threads running at once. They
+     * converge to the same image rather than to the same noise.
+     *
+     * \param width Image width in pixels.
+     * \param height Image height.
+     * \param samplesPerPixel Samples taken for every pixel.
+     * \param seed Base seed; the same seed reproduces the same image.
+     * \param maxDepth Longest path to follow, in bounces.
+     * \param colour Resized to width * height and filled with linear radiance.
+     * \param albedo Filled with the first hit's surface colour, for a denoiser.
+     * \param normal Filled with the first hit's normal.
+     * \returns False if the launch failed.
+     */
+    auto render(int width, int height, unsigned int samplesPerPixel, unsigned long long seed, unsigned int maxDepth,
+                std::vector<Vec3> &colour, std::vector<Vec3> &albedo, std::vector<Vec3> &normal) -> bool;
 
   private:
     Tracer() = default;

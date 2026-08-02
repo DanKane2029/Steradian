@@ -41,6 +41,17 @@ class Texture
         return m_Height;
     }
 
+    auto getChannels() const -> int
+    {
+        return m_NumChannels;
+    }
+
+    /** the raw pixels, for a backend that copies them somewhere else */
+    auto getData() const -> const std::vector<float> &
+    {
+        return m_Data;
+    }
+
     /**
      * \brief Samples the texture at the given coordinates.
      *

@@ -26,11 +26,16 @@ class Config
     // the second set the shadow ray count of the direct lighting model, which the path
     // integrator replaced with next event estimation. Both are ignored if present in a
     // config file.
-    unsigned int numThreads;
-    unsigned int numChildrenInBVHLeafNodes;
-    unsigned int maxRecurseLevel;
+    // Defaulted rather than left indeterminate. A config built in code, as the tests do,
+    // otherwise starts with a garbage path depth and a garbage thread count.
+    unsigned int numThreads = 8;
+    unsigned int numChildrenInBVHLeafNodes = 2;
+    unsigned int maxRecurseLevel = 10;
 
   public:
+    /** \brief A config with the defaults above, for callers that set what they need. */
+    Config() = default;
+
     Config(std::string filePath);
 
   private:

@@ -1,9 +1,10 @@
 #pragma once
-#include <cmath>
-#include <cstdint>
-#include <type_traits>
-
+#include "Utils/DeviceCompat.h"
 #include "Utils/Vec3.h"
+
+#ifndef __CUDACC_RTC__
+#include <type_traits>
+#endif
 
 /**
  * \brief How light interacts with a surface.
@@ -82,13 +83,13 @@ struct Material
     float checkerScale = 0.0f;
 
     /** true when this material paints a checker rather than a flat colour */
-    auto hasChecker() const -> bool
+    PT_HOST_DEVICE auto hasChecker() const -> bool
     {
         return checkerScale > 0.0f;
     }
 
     /** true when this surface emits light and should be sampled as an emitter */
-    auto isEmissive() const -> bool
+    PT_HOST_DEVICE auto isEmissive() const -> bool
     {
         return emissive.x > 0.0f || emissive.y > 0.0f || emissive.z > 0.0f;
     }
@@ -102,14 +103,14 @@ struct Material
      *
      * \param position Where the point is in the world, for the procedural checker.
      */
-    auto baseAlbedo(const Vec3 &position) const -> Vec3
+    PT_HOST_DEVICE auto baseAlbedo(const Vec3 &position) const -> Vec3
     {
         return hasChecker() ? checkerAt(position) : albedo;
     }
 
   private:
     /** \brief Which of the two checker colours covers a point. */
-    auto checkerAt(const Vec3 &position) const -> Vec3
+    PT_HOST_DEVICE auto checkerAt(const Vec3 &position) const -> Vec3
     {
         const float inverseScale = 1.0f / checkerScale;
 
@@ -120,7 +121,7 @@ struct Material
         // the intersection returned +0 or a value a hair below it. That decides the colour,
         // so the floor would come out speckled rather than checkered. Offsetting by half a
         // square puts the common cases in the middle of a cell instead of on its edge.
-        const auto cell = [inverseScale](float v) { return static_cast<int>(std::floor((v * inverseScale) + 0.5f)); };
+        const auto cell = [inverseScale](float v) { return static_cast<int>(floorf((v * inverseScale) + 0.5f)); };
 
         const int parity = (cell(position.x) + cell(position.y) + cell(position.z)) & 1;
 
@@ -128,6 +129,10 @@ struct Material
     }
 };
 
+#ifndef __CUDACC_RTC__
+
 // The whole point of the type. If this ever fails, something that owns memory has been
 // added to a material, and an array of them can no longer be handed to a device.
 static_assert(std::is_trivially_copyable_v<Material>, "Material must stay copyable as bytes");
+
+#endif

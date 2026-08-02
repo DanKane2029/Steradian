@@ -54,7 +54,7 @@ auto main(int argc, char *argv[]) -> int
     }
 
     std::string error;
-    const std::unique_ptr<Gpu::Tracer> tracer = Gpu::Tracer::create(geometry, error);
+    const std::unique_ptr<Gpu::Tracer> tracer = Gpu::Tracer::create(scene, error);
 
     if (tracer == nullptr)
     {

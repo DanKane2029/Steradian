@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Scene/Material.h"
 #include "Scene/Primitives.h"
 #include "Utils/DeviceCompat.h"
 #include "Utils/Vec3.h"
@@ -42,16 +43,52 @@ inline constexpr unsigned int noPrimitive = 0xFFFFFFFFu;
  */
 struct DeviceGeometry
 {
+    // Vertex attributes, indexed exactly as on the host. Positions are handed to the
+    // acceleration structure as well, but shading needs them for the geometric normal.
+    const Vec3 *positions;
+    const Vec3 *normals;
+    const Vec3 *texCoords;
+
+    const Triangle *triangles;
     const Sphere *spheres;
+
     unsigned int triangleCount;
     unsigned int sphereCount;
+};
+
+/**
+ * \brief One image, as a flat block of floats with its shape alongside.
+ *
+ * Textures are uploaded into a single buffer with each image's extent recorded here, so
+ * a material's index reaches its pixels in one indirection rather than through a pointer
+ * per texture.
+ */
+struct DeviceTexture
+{
+    unsigned int offset;
+    int width;
+    int height;
+    int channels;
+};
+
+/** \brief The camera, reduced to what generating a ray actually needs. */
+struct DeviceCamera
+{
+    Vec3 origin;
+    Vec3 direction;
+    Vec3 right;
+    Vec3 up;
+
+    float halfWidth;
+    float halfHeight;
 };
 
 /**
  * \brief Everything one launch needs.
  *
  * Passed to the device as a single constant-memory block, which is the cheapest place for
- * values every thread reads.
+ * values every thread reads. Two launch shapes share it: a bare traversal, which uses the
+ * ray arrays, and a render, which uses the camera and the film.
  */
 struct LaunchParams
 {
@@ -60,18 +97,40 @@ struct LaunchParams
 
     DeviceGeometry geometry;
 
-    /** ray origins and directions, one pair per thread */
+    const Material *materials;
+    const Emitter *emitters;
+    unsigned int emitterCount;
+
+    /** the microfacet energy compensation table, measured on the host */
+    const float *albedoTable;
+
+    const DeviceTexture *textures;
+    const float *texturePixels;
+
+    /** radiance arriving from every direction where no geometry is hit */
+    Vec3 ambient;
+
+    // ---- bare traversal ----------------------------------------------------------
     const Vec3 *rayOrigins;
     const Vec3 *rayDirections;
-
-    /** where each ray's result goes */
     DeviceHit *hits;
-
-    /** the interval along each ray that counts, matching the CPU's Ray */
     float tMin;
     float tMax;
-
     unsigned int rayCount;
+
+    // ---- rendering ---------------------------------------------------------------
+    DeviceCamera camera;
+
+    /** the accumulated image, and the guides a denoiser needs, one entry per pixel */
+    Vec3 *film;
+    Vec3 *filmAlbedo;
+    Vec3 *filmNormal;
+
+    int width;
+    int height;
+    unsigned int samplesPerPixel;
+    unsigned int maxDepth;
+    unsigned long long seed;
 };
 
 } // namespace Gpu
