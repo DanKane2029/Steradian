@@ -72,9 +72,8 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release \
 
 ### GPU support
 
-**Nothing renders on the GPU yet.** What exists today is the toolchain and the plumbing:
-a build option, and a `--gpu-info` command that reports whether this machine can actually
-run the backend being built. The renderer itself is unchanged, and a build without
+**Nothing renders on the GPU yet.** What exists today is the toolchain, and a maths core
+that compiles for both. The renderer itself is unchanged, and a build without
 `PT_ENABLE_GPU` is byte-for-byte the same as one from before any of it existed.
 
 ```sh
@@ -103,6 +102,35 @@ resident threads and **RT core version 20** — the fixed-function ray/box inter
 hardware. That last number is the one that matters: the dragon spends 658 bounding box
 visits per ray against 87.5 triangle tests, so traversal is the cost, and traversal is
 exactly what that silicon does.
+
+#### One copy of the maths
+
+`Vec3`, the generator, the sampling routines and the microfacet model compile unchanged as
+host C++ *and* as device code. There is no second implementation to keep in step, because
+two copies of a BSDF drift apart and the drift surfaces as an image that is subtly wrong on
+one backend in a way no test written against either backend alone would catch.
+
+What made that possible was mostly subtraction. `Vec3` had grown an `<iostream>`, a
+`std::vector` constructor and an exception; NVRTC has no standard library at all, so those
+went to the scene loader, which is the only place that ever wanted them. The one thing that
+genuinely cannot cross is the energy compensation table, which is *measured* at load by
+sampling the microfacet routines a few million times — so the measuring stayed on the host
+and only the lookup is shared, with the table passed in.
+
+The claim is tested rather than asserted. `device_parity` reads those header files out of
+the source tree, compiles them with NVRTC, runs them on the GPU and compares against the
+host's own answers for 65,536 random inputs. Editing `Vec3.h` to use `std::vector` again
+fails that test rather than Stage 3.
+
+Two standards are applied, because two different things are being claimed. The generator
+must agree **bit for bit** — it is integer arithmetic, and everything else depends on both
+sides drawing the same numbers. The floating point quantities must agree **closely**:
+CUDA's `sinf` is not glibc's, and no amount of care makes them identical. Seventeen of the
+twenty quantities agree to 6e-5 absolute or better. The other three are unbounded — a
+near-mirror GGX lobe evaluates into the thousands — and agree to 5.4e-4 relative. The
+thresholds sit an order of magnitude above the worst observed, and were checked for teeth
+by deleting a term from the masking function: that shows up at 8.7e-1, roughly 180 times
+outside them.
 
 ### Build options
 
@@ -197,7 +225,8 @@ ctest --test-dir build --output-on-failure
 ```
 
 Twenty-two tests, about twenty-four seconds. Most of that is path tracing the two
-Stanford models; everything else finishes in around three.
+Stanford models; everything else finishes in around three. A GPU build adds a
+twenty-third, comparing the shared maths across backends.
 
 ---
 
@@ -478,7 +507,7 @@ legitimately alter every pixel.
 
 ## How it is tested
 
-Twenty-two tests, running in about twenty-four seconds.
+Twenty-two tests, running in about twenty-four seconds, plus one more on a GPU build.
 
 **Reference images.** Thirteen scenes rendered at a fixed seed and sample count, compared
 against committed references. Tolerances are tight, and were chosen by measuring what a

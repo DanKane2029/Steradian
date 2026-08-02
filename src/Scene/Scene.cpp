@@ -18,6 +18,27 @@ namespace
  * Several scene files in res/scenes predate later material fields. Treating those
  * fields as optional keeps older scenes loadable instead of throwing on parse.
  */
+/**
+ * builds a vector from a JSON array of three numbers
+ *
+ * This lived on Vec3 itself until Vec3 had to become something a device can compile,
+ * which ruled out both the std::vector it took and the exception it threw. The scene
+ * loader is the only place that ever built one this way, and the only place that can say
+ * anything useful when the array is the wrong length.
+ */
+auto toVec3(const json &data) -> Vec3
+{
+    const auto values = data.get<std::vector<float>>();
+
+    if (values.size() < 3)
+    {
+        throw std::runtime_error("Scene has a vector with " + std::to_string(values.size()) +
+                                 " components, expected three");
+    }
+
+    return {values[0], values[1], values[2]};
+}
+
 auto optionalFloat(const json &data, const char *key, float fallback) -> float
 {
     if (!data.contains(key) || data.at(key).is_null())
@@ -65,12 +86,12 @@ auto parseTransform(const json &object) -> Transform
 
     if (object.contains("translate"))
     {
-        transform.translation = Vec3(object.at("translate").get<std::vector<float>>());
+        transform.translation = toVec3(object.at("translate"));
     }
 
     if (object.contains("rotate"))
     {
-        transform.rotationDegrees = Vec3(object.at("rotate").get<std::vector<float>>());
+        transform.rotationDegrees = toVec3(object.at("rotate"));
     }
 
     if (object.contains("scale"))
@@ -79,7 +100,7 @@ auto parseTransform(const json &object) -> Transform
 
         // A single number is the common case and reads better than repeating it three
         // times, so both forms are accepted.
-        transform.scale = scale.is_number() ? Vec3(scale.get<float>()) : Vec3(scale.get<std::vector<float>>());
+        transform.scale = scale.is_number() ? Vec3(scale.get<float>()) : toVec3(scale);
     }
 
     return transform;
@@ -170,7 +191,7 @@ Scene::Scene(std::string filePath)
     // Asset paths inside the scene are resolved relative to the scene file itself.
     const std::filesystem::path sceneDir = std::filesystem::absolute(filePath).parent_path();
 
-    m_AmbientLighting = Vec3(data.at(m_keywords.ambientLighting).get<std::vector<float>>());
+    m_AmbientLighting = toVec3(data.at(m_keywords.ambientLighting));
 
     const json &cameraData = data.at(m_keywords.camera);
 
@@ -182,11 +203,11 @@ Scene::Scene(std::string filePath)
     Vec3 worldUp(0.0f, 1.0f, 0.0f);
     if (cameraData.contains("up"))
     {
-        worldUp = Vec3(cameraData.at("up").get<std::vector<float>>());
+        worldUp = toVec3(cameraData.at("up"));
     }
 
-    m_Camera = Camera(Vec3(cameraData.at(m_keywords.cameraOrg).get<std::vector<float>>()),
-                      Vec3(cameraData.at(m_keywords.cameraLookAt).get<std::vector<float>>()), fovY, worldUp);
+    m_Camera = Camera(toVec3(cameraData.at(m_keywords.cameraOrg)), toVec3(cameraData.at(m_keywords.cameraLookAt)), fovY,
+                      worldUp);
 
     json materials = data.at(m_keywords.materials);
     for (auto it = materials.begin(); it != materials.end(); ++it)
@@ -201,21 +222,21 @@ Scene::Scene(std::string filePath)
         // equivalent rather than being rejected.
         if (materialData.contains("albedo"))
         {
-            material.albedo = Vec3(materialData.at("albedo").get<std::vector<float>>());
+            material.albedo = toVec3(materialData.at("albedo"));
         }
         else if (materialData.contains("diffuse"))
         {
-            material.albedo = Vec3(materialData.at("diffuse").get<std::vector<float>>());
+            material.albedo = toVec3(materialData.at("diffuse"));
         }
 
         if (materialData.contains("absorption"))
         {
-            material.absorption = Vec3(materialData.at("absorption").get<std::vector<float>>());
+            material.absorption = toVec3(materialData.at("absorption"));
         }
 
         if (materialData.contains("emissive"))
         {
-            material.emissive = Vec3(materialData.at("emissive").get<std::vector<float>>());
+            material.emissive = toVec3(materialData.at("emissive"));
         }
 
         material.roughness = optionalFloat(materialData, "roughness", 0.0f);
@@ -268,8 +289,8 @@ Scene::Scene(std::string filePath)
 
             // The material's own albedo is the first colour, so only the second needs
             // naming here. A default square size keeps the common case to one word.
-            material.checkerAlbedo = checker.contains("albedo") ? Vec3(checker.at("albedo").get<std::vector<float>>())
-                                                                : Vec3(0.05f, 0.05f, 0.05f);
+            material.checkerAlbedo =
+                checker.contains("albedo") ? toVec3(checker.at("albedo")) : Vec3(0.05f, 0.05f, 0.05f);
             material.checkerScale = optionalFloat(checker, "scale", 1.0f);
         }
 
@@ -295,18 +316,18 @@ Scene::Scene(std::string filePath)
         }
         else if (type == "triangle")
         {
-            const Vec3 point0(object.at("point0").get<std::vector<float>>());
-            const Vec3 point1(object.at("point1").get<std::vector<float>>());
-            const Vec3 point2(object.at("point2").get<std::vector<float>>());
+            const Vec3 point0 = toVec3(object.at("point0"));
+            const Vec3 point1 = toVec3(object.at("point1"));
+            const Vec3 point2 = toVec3(object.at("point2"));
 
             const bool hasNormals =
                 object.contains("normal0") && object.contains("normal1") && object.contains("normal2");
 
             // A triangle written without vertex normals stores zero ones, and shading
             // falls back to the plane it lies in.
-            const Vec3 normal0 = hasNormals ? Vec3(object.at("normal0").get<std::vector<float>>()) : Vec3();
-            const Vec3 normal1 = hasNormals ? Vec3(object.at("normal1").get<std::vector<float>>()) : Vec3();
-            const Vec3 normal2 = hasNormals ? Vec3(object.at("normal2").get<std::vector<float>>()) : Vec3();
+            const Vec3 normal0 = hasNormals ? toVec3(object.at("normal0")) : Vec3();
+            const Vec3 normal1 = hasNormals ? toVec3(object.at("normal1")) : Vec3();
+            const Vec3 normal2 = hasNormals ? toVec3(object.at("normal2")) : Vec3();
 
             const uint32_t firstVertex = m_Geometry.vertexCount();
 
@@ -319,7 +340,7 @@ Scene::Scene(std::string filePath)
         }
         else if (type == "sphere")
         {
-            const Vec3 center(object.at("center").get<std::vector<float>>());
+            const Vec3 center = toVec3(object.at("center"));
             const float radius = object.at("radius");
 
             // Placed here rather than by a later pass, so the emitter below is registered
@@ -370,8 +391,8 @@ Scene::Scene(std::string filePath)
                 continue;
             }
 
-            const Vec3 pos(light.at("pos").get<std::vector<float>>());
-            const Vec3 color(light.at("color").get<std::vector<float>>());
+            const Vec3 pos = toVec3(light.at("pos"));
+            const Vec3 color = toVec3(light.at("color"));
             const float intensity = optionalFloat(light, "intensity", 1.0f);
             const float radius = std::max(optionalFloat(light, "radius", 0.1f), 1e-3f);
 

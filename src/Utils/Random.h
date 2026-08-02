@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cstdint>
+#include "Utils/DeviceCompat.h"
 
 /**
  * \brief A small, fast, seekable pseudo random number generator (PCG32).
@@ -10,11 +10,16 @@
  * renderer needs: no shared mutable state between threads, no lock contention, and
  * output that is reproducible for a given seed regardless of thread count.
  *
+ * Compiled unchanged as device code: it is integer arithmetic and nothing else, which is
+ * also why the same seed produces the same stream on either backend.
+ *
  * Reference: https://www.pcg-random.org/
  */
 class Rng
 {
   public:
+    // No annotation: a defaulted trivial constructor is usable on either side already,
+    // and marking it draws a warning from NVRTC rather than doing anything.
     Rng() = default;
 
     /**
@@ -26,7 +31,7 @@ class Rng
      * \param seed The base seed for the render.
      * \param sequence The stream selector, typically derived from the pixel row or tile.
      */
-    Rng(uint64_t seed, uint64_t sequence)
+    PT_HOST_DEVICE Rng(uint64_t seed, uint64_t sequence)
     {
         m_State = 0U;
         m_Increment = (sequence << 1U) | 1U;
@@ -38,7 +43,7 @@ class Rng
     /**
      * \brief Returns the next uniformly distributed 32 bit value.
      */
-    auto nextUInt() -> uint32_t
+    PT_HOST_DEVICE auto nextUInt() -> uint32_t
     {
         const uint64_t oldState = m_State;
         m_State = (oldState * 6364136223846793005ULL) + m_Increment;
@@ -52,7 +57,7 @@ class Rng
     /**
      * \brief Returns the next uniformly distributed float in [0, 1).
      */
-    auto nextFloat() -> float
+    PT_HOST_DEVICE auto nextFloat() -> float
     {
         // 24 bits of mantissa keeps the result exactly representable as a float.
         return static_cast<float>(nextUInt() >> 8U) * 0x1.0p-24f;
@@ -61,7 +66,7 @@ class Rng
     /**
      * \brief Returns the next uniformly distributed float in [-1, 1).
      */
-    auto nextFloatSigned() -> float
+    PT_HOST_DEVICE auto nextFloatSigned() -> float
     {
         return (nextFloat() * 2.0f) - 1.0f;
     }

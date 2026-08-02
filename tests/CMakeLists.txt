@@ -137,3 +137,21 @@ add_test(NAME determinism
         -P ${CMAKE_CURRENT_SOURCE_DIR}/run_determinism_test.cmake
 )
 set_tests_properties(determinism PROPERTIES TIMEOUT 300)
+
+# Cross-backend agreement for the shared maths. Only meaningful with a GPU, so it is built
+# only when GPU support is, and it is the check that Stage 2's whole claim rests on: that
+# Vec3, Rng, Sampling and Microfacet compile unchanged as device code and compute the same
+# things there.
+#
+# It reads the headers straight out of the source tree and hands them to NVRTC, so a
+# header that stops being device-portable fails here rather than months later.
+if(PT_GPU_ENABLED)
+    add_executable(device_parity device_parity.cpp)
+
+    target_link_libraries(device_parity PRIVATE pt_core pt_gpu pt_warnings)
+    target_compile_definitions(device_parity PRIVATE PT_SOURCE_DIR="${CMAKE_SOURCE_DIR}/src")
+    set_target_properties(device_parity PROPERTIES BUILD_RPATH "${PT_GPU_SDK_DIR}/lib")
+
+    add_test(NAME device.parity COMMAND device_parity 65536)
+    set_tests_properties(device.parity PROPERTIES TIMEOUT 300)
+endif()
