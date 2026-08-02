@@ -127,6 +127,8 @@ jobs:
       - name: Check formatting
         run: |
           # Vendored stb headers are excluded; they are not ours to reformat.
-          files=$(find src tests -name '*.h' -o -name '*.cpp' \
+          # .cu is included: device code is source like any other, and it is the part
+          # no compiler in this workflow parses, so nothing else would notice it drifting.
+          files=$(find src tests \( -name '*.h' -o -name '*.cpp' -o -name '*.cu' \) \
             | grep -v 'stb_image.h' | grep -v 'stb_image_write.h')
           clang-format --dry-run --Werror $files

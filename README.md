@@ -72,9 +72,10 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release \
 
 ### GPU support
 
-**Nothing renders on the GPU yet.** What exists today is the toolchain, and a maths core
-that compiles for both. The renderer itself is unchanged, and a build without
-`PT_ENABLE_GPU` is byte-for-byte the same as one from before any of it existed.
+**Nothing renders on the GPU yet.** What exists today is the toolchain, a maths core that
+compiles for both, and ray traversal running on the RT cores. The renderer itself is
+unchanged, and a build without `PT_ENABLE_GPU` is byte-for-byte the same as one from
+before any of it existed.
 
 ```sh
 scripts/build.sh --gpu
@@ -102,6 +103,45 @@ resident threads and **RT core version 20** — the fixed-function ray/box inter
 hardware. That last number is the one that matters: the dragon spends 658 bounding box
 visits per ray against 87.5 triangle tests, so traversal is the cost, and traversal is
 exactly what that silicon does.
+
+#### Traversal on the RT cores
+
+An OptiX pipeline builds the acceleration structure from the same flat arrays the CPU
+uses, and traces against it. Triangles go through OptiX's built-in intersection so the
+hardware does the work; spheres are custom primitives intersected by a program that mirrors
+the CPU's own test, because using OptiX's built-in sphere would mean maintaining a second
+implementation of something this project already has.
+
+Whether that is *correct* is checked the same way the CPU hierarchy was — against a
+reference that is already trusted. `device_traversal` fires the same rays at both backends
+and compares. Across seven scenes and 200,000 rays each, from three primitives up to the
+dragon's 202,522 triangles:
+
+| | |
+|---|---|
+| hit/miss disagreements | **0** |
+| wrong primitive reported | **0** |
+| worst distance difference | 1.3e-4 relative |
+
+Exact agreement is neither expected nor asked for: OptiX intersects triangles with its own
+watertight algorithm on dedicated hardware rather than with this project's
+Möller-Trumbore. A ray grazing a shared edge may legitimately be given to either triangle.
+What would not be legitimate is a systematic disagreement, and deleting the offset that
+maps sphere indices into the shared numbering makes 6.7% of hits report the wrong
+primitive — 130 times the threshold — which is how that test was checked for teeth.
+
+Traversal alone, against a single CPU thread:
+
+| Scene | GPU | CPU (1 thread) |
+|---|---|---|
+| `cornell_box` | 174 M rays/s | 9.2 M rays/s |
+| `dragon` | **240 M rays/s** | 7.2 M rays/s |
+
+The interesting number is not the ratio, it is that the GPU is **faster on the dragon than
+on the Cornell box** while the CPU is slower — the dragon's 658 box visits per ray are
+what the RT cores exist to absorb. What any of this is worth to a finished image is the
+next stage's question, and it will be answered by rendering one rather than by scaling
+these.
 
 #### One copy of the maths
 
@@ -225,8 +265,8 @@ ctest --test-dir build --output-on-failure
 ```
 
 Twenty-two tests, about twenty-four seconds. Most of that is path tracing the two
-Stanford models; everything else finishes in around three. A GPU build adds a
-twenty-third, comparing the shared maths across backends.
+Stanford models; everything else finishes in around three. A GPU build adds eight
+more, comparing the shared maths and the traversal against the CPU.
 
 ---
 
@@ -507,7 +547,7 @@ legitimately alter every pixel.
 
 ## How it is tested
 
-Twenty-two tests, running in about twenty-four seconds, plus one more on a GPU build.
+Twenty-two tests, running in about twenty-four seconds, plus eight more on a GPU build.
 
 **Reference images.** Thirteen scenes rendered at a fixed seed and sample count, compared
 against committed references. Tolerances are tight, and were chosen by measuring what a

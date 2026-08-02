@@ -39,13 +39,45 @@ target_link_libraries(steradian PRIVATE pt_core pt_warnings)
 if(PT_GPU_ENABLED)
     # Kept out of pt_core deliberately. The renderer core, and therefore every test,
     # must not acquire a dependency on the GPU SDK; only the executable links this.
-    add_library(pt_gpu STATIC Gpu/DeviceInfo.cpp Gpu/Nvrtc.cpp)
+    # Device code is compiled at run time, so its source has to travel with the binary.
+    # This bakes the kernel and the headers it includes into one generated header, under
+    # the names their #include directives use.
+    set(PT_DEVICE_SOURCES
+        Utils/DeviceCompat.h
+        Utils/Vec3.h
+        Scene/Primitives.h
+        Gpu/DeviceTypes.h
+        Gpu/device/Trace.cu
+    )
+
+    set(PT_DEVICE_SOURCES_HEADER ${CMAKE_CURRENT_BINARY_DIR}/generated/DeviceSources.h)
+
+    list(TRANSFORM PT_DEVICE_SOURCES PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/ OUTPUT_VARIABLE PT_DEVICE_SOURCE_PATHS)
+
+    add_custom_command(
+        OUTPUT ${PT_DEVICE_SOURCES_HEADER}
+        COMMAND ${CMAKE_COMMAND}
+            "-DSOURCES=${PT_DEVICE_SOURCES}"
+            -DBASE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -DOUTPUT=${PT_DEVICE_SOURCES_HEADER}
+            -P ${CMAKE_SOURCE_DIR}/cmake/embed_device_sources.cmake
+        DEPENDS ${PT_DEVICE_SOURCE_PATHS} ${CMAKE_SOURCE_DIR}/cmake/embed_device_sources.cmake
+        COMMENT "Embedding device sources"
+        VERBATIM
+    )
+
+    add_library(pt_gpu STATIC Gpu/DeviceInfo.cpp Gpu/Nvrtc.cpp Gpu/Tracer.cpp ${PT_DEVICE_SOURCES_HEADER})
+
+    target_include_directories(pt_gpu PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
+    target_link_libraries(pt_gpu PUBLIC pt_core)
 
     target_include_directories(pt_gpu PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${PT_GPU_SDK_DIR}/include)
 
     # NVRTC opens its builtins library by name at the first compilation, and that search
     # does not use this executable's runpath. Gpu::prepareNvrtc opens it from here first.
-    target_compile_definitions(pt_gpu PRIVATE PT_GPU_SDK_LIB_DIR="${PT_GPU_SDK_DIR}/lib")
+    target_compile_definitions(pt_gpu PRIVATE
+        PT_GPU_SDK_LIB_DIR="${PT_GPU_SDK_DIR}/lib"
+        PT_GPU_SDK_INCLUDE_DIR="${PT_GPU_SDK_DIR}/include")
 
     # libcuda is linked through the stub rather than the installed driver. The stub
     # exports the same entry points under the same soname, so the loader binds to the

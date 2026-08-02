@@ -154,4 +154,19 @@ if(PT_GPU_ENABLED)
 
     add_test(NAME device.parity COMMAND device_parity 65536)
     set_tests_properties(device.parity PROPERTIES TIMEOUT 300)
+
+    # The GPU counterpart of bvh_consistency: the acceleration structure and traversal
+    # must find the same geometry the CPU hierarchy does. Guards the instance hierarchy,
+    # the custom sphere primitives, and the mapping from OptiX primitive indices back to
+    # this project's numbering.
+    add_executable(device_traversal device_traversal.cpp)
+
+    target_link_libraries(device_traversal PRIVATE pt_core pt_gpu pt_warnings)
+    set_target_properties(device_traversal PROPERTIES BUILD_RPATH "${PT_GPU_SDK_DIR}/lib")
+
+    foreach(scene two_spheres glossy_spheres cornell_box test_obj_ball test_man_obj bunny dragon)
+        add_test(NAME device.traversal.${scene}
+            COMMAND device_traversal ${CMAKE_SOURCE_DIR}/res/scenes/${scene}.json 200000)
+        set_tests_properties(device.traversal.${scene} PROPERTIES TIMEOUT 300)
+    endforeach()
 endif()
