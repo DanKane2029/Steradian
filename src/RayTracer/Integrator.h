@@ -63,7 +63,7 @@ class Integrator
      * light subtending a small solid angle is hit by chance only rarely, and each such
      * hit carries enormous weight.
      */
-    auto sampleDirectLighting(const Hit &hit, const Material &material, const Vec3 &albedo, const Vec3 &viewDir,
+    auto sampleDirectLighting(const Surface &surface, const Material &material, const Vec3 &albedo, const Vec3 &viewDir,
                               Rng &rng) const -> Vec3;
 
     /**

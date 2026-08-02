@@ -15,6 +15,7 @@
 #include "Utils/Random.h"
 
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -23,16 +24,16 @@ namespace
 {
 
 /** intersects a ray against every primitive in the scene, ignoring the hierarchy */
-auto bruteForce(const std::vector<std::shared_ptr<SceneObject>> &objects, const Ray &ray) -> Hit
+auto bruteForce(const Geometry &geometry, const Ray &ray) -> Hit
 {
     Hit closest;
     float bestTime = ray.tMax;
 
-    for (const std::shared_ptr<SceneObject> &object : objects)
+    for (uint32_t primitive = 0; primitive < geometry.primitiveCount(); primitive++)
     {
-        const Hit hit = object->rayIntersect(ray);
+        const Hit hit = geometry.intersect(primitive, ray);
 
-        if (hit.isHit && hit.time < bestTime)
+        if (hit.isHit() && hit.time < bestTime)
         {
             closest = hit;
             bestTime = hit.time;
@@ -64,19 +65,14 @@ auto main(int argc, char *argv[]) -> int
         return 1;
     }
 
-    const std::vector<std::shared_ptr<SceneObject>> &objects = scene.getObjectList();
+    const Geometry &geometry = scene.getGeometry();
 
     std::printf("scene has %zu primitives, %zu nodes, max depth %u\n", bvh->primitiveCount(), bvh->nodeCount(),
                 bvh->maxDepth());
 
     // Aim rays from a shell around the scene towards points inside it, so most of them
     // actually engage with the geometry rather than sailing past.
-    AABB sceneBounds;
-    for (const std::shared_ptr<SceneObject> &object : objects)
-    {
-        sceneBounds.expand(Vec3(object->getMinX(), object->getMinY(), object->getMinZ()));
-        sceneBounds.expand(Vec3(object->getMaxX(), object->getMaxY(), object->getMaxZ()));
-    }
+    const AABB sceneBounds = geometry.bounds();
 
     const Vec3 center = sceneBounds.centroid();
     const float radius = std::max(sceneBounds.extent().length(), 1.0f);
@@ -96,20 +92,20 @@ auto main(int argc, char *argv[]) -> int
         const Ray ray(origin, target - origin);
 
         const Hit fromBvh = bvh->intersect(ray);
-        const Hit fromScan = bruteForce(objects, ray);
+        const Hit fromScan = bruteForce(geometry, ray);
 
-        if (fromBvh.isHit != fromScan.isHit)
+        if (fromBvh.isHit() != fromScan.isHit())
         {
             if (mismatches < 5)
             {
-                std::fprintf(stderr, "ray %d: BVH says %s, brute force says %s\n", i, fromBvh.isHit ? "hit" : "miss",
-                             fromScan.isHit ? "hit" : "miss");
+                std::fprintf(stderr, "ray %d: BVH says %s, brute force says %s\n", i, fromBvh.isHit() ? "hit" : "miss",
+                             fromScan.isHit() ? "hit" : "miss");
             }
             mismatches++;
             continue;
         }
 
-        if (fromScan.isHit)
+        if (fromScan.isHit())
         {
             hits++;
 
@@ -129,7 +125,7 @@ auto main(int argc, char *argv[]) -> int
             // An occlusion query bounded just short of the hit must agree that something
             // is in the way.
             const Ray shadowRay(origin, target - origin, Ray::defaultEpsilon, fromScan.time * 0.999f);
-            if (bvh->isOccluded(shadowRay) && !bruteForce(objects, shadowRay).isHit)
+            if (bvh->isOccluded(shadowRay) && !bruteForce(geometry, shadowRay).isHit())
             {
                 occlusionMismatches++;
             }

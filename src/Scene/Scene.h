@@ -5,9 +5,9 @@
 #include <vector>
 
 #include "BVH.h"
+#include "Geometry.h"
 #include "Material.h"
 #include "RayTracer/Camera.h"
-#include "SceneObject.h"
 
 /**
  * a collection of primitive scene objects, lights, and materials
@@ -49,7 +49,7 @@ class Scene
 
     Vec3 m_AmbientLighting;
 
-    std::vector<std::shared_ptr<SceneObject>> m_ObjectList{};
+    Geometry m_Geometry{};
 
     // Materials live in one array and are referenced by index. The name map is used only
     // while loading; nothing looks a material up by string once rendering starts.
@@ -62,9 +62,11 @@ class Scene
     Camera m_Camera;
 
   public:
-    auto getObjectList() -> const std::vector<std::shared_ptr<SceneObject>> &;
-    void addObject(std::shared_ptr<SceneObject> sceneObject, uint32_t materialIndex);
-    void addObjects(const std::vector<std::shared_ptr<SceneObject>> &sceneObjectList, uint32_t materialIndex);
+    /** the scene's primitives, in the flat arrays the renderer traverses */
+    auto getGeometry() const -> const Geometry &
+    {
+        return m_Geometry;
+    }
 
     /** registers a material and returns the index it can be referenced by */
     auto registerMaterial(const Material &material) -> uint32_t;

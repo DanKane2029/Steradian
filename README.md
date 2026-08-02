@@ -307,6 +307,44 @@ build time or memory and no change whatsoever to the resulting image.
 Shadow rays use a separate query that stops at the first thing it meets, since they only
 need to know whether the light is visible, not what is nearest.
 
+### How the geometry is stored
+
+Primitives are held in flat typed arrays rather than as individually allocated polymorphic
+objects: one shared vertex buffer, a 16-byte triangle of three indices and a material, and
+a separate sphere array. Intersection is a direct call on an index instead of a virtual
+call through a pointer. The dragon was 202,523 separate heap allocations and is now four
+arrays.
+
+What an intersection test *reports* was cut down too, from 88 bytes to 16 — a distance, two
+barycentric weights and a primitive index. A ray against the dragon runs about 88 primitive
+tests and keeps one, so interpolating a normal and a texture coordinate inside every test
+was paying for work that was thrown away almost every time. Those are now derived once, for
+the primitive that wins.
+
+Two things had to be measured rather than assumed. Indexed vertices are the right way to
+*store* a mesh but the wrong way to *read* one: following an index to a triangle to its
+three scattered vertices is a chain of dependent loads, and it cost more than the virtual
+call it replaced, leaving the first version of this layout **17% slower** on the dragon
+while doing provably identical work — the same node visits and the same primitive tests,
+only slower to fetch. The fix is to also keep the triangles de-indexed and pre-differenced
+in the form the test actually wants, and to renumber primitives and vertices into the order
+traversal reads them.
+
+The result, at 400×320 and 32 samples per pixel, against the polymorphic version:
+
+| Scene | Render time | Peak memory |
+| --- | --- | --- |
+| `cornell_box` | 0.76 s → **0.60 s** | — |
+| `test_man_obj` | 1.09 s → **1.05 s** | — |
+| `bunny` | 24.88 s → **24.70 s** | 32.8 MB → **23.8 MB** |
+| `dragon` | 16.11 s → **16.00 s** | 77.0 MB → **52.3 MB** |
+
+The honest reading is that the memory win is the large one, and the time win is
+concentrated where per-test overhead dominates. On the heavy meshes it is barely more than
+noise, and the counters say why: the dragon spends 658 node visits per ray against 87.5
+primitive tests, so it is bounded by box tests, which this change does not touch. Every
+scene renders byte-for-byte the same image as before.
+
 ### Coloured glass
 
 ![Clear, tinted and deeply absorbing glass](docs/glass.png)

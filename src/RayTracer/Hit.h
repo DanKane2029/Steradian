@@ -1,93 +1,41 @@
 #pragma once
-#include "RayTracer/Ray.h"
-#include "Utils/Vec3.h"
+#include <cmath>
 #include <cstdint>
 
 /**
- * \brief The result of a ray object intersection.
+ * \brief What an intersection test reports: where along the ray, and which primitive.
  *
- * A set of data that describes a ray scene-object interesction.
+ * Sixteen bytes, and deliberately nothing more. This record is produced by every
+ * primitive test a ray performs -- hundreds of them against a mesh -- and all but one of
+ * those results is discarded. It previously carried a position, a normal, a texture
+ * coordinate, a material index and a copy of the ray, all computed on every test and
+ * almost always thrown away.
+ *
+ * The attributes shading needs are recovered from this once, for the winner, by
+ * Geometry::surfaceAt.
  */
 struct Hit
 {
-  public:
-    /**
-     * \brief True if the ray intersected the object.
-     *
-     * Boolean variable used to describe if the ray intersected the scene object. If false all the other data in the hit
-     * object should not be read or used.
-     */
-    bool isHit = false;
+    /** \brief Distance along the ray, in the units of its direction vector. */
+    float time = INFINITY;
 
     /**
-     * \brief The time it took the ray to hit the object.
+     * \brief Barycentric weights of the second and third vertices.
      *
-     * The time parameter is the value of time in this equation that describes the ray 'rayPosition = rayDirection *
-     * time + rayOrigin' where 'rayPosition' is the position of the hit object.
+     * Produced for free by the triangle test, which has to compute them anyway to decide
+     * whether the intersection lies inside the triangle. Unused for spheres, whose
+     * surface point follows from the distance alone.
      */
-    float time;
+    float u = 0.0f;
+    float v = 0.0f;
 
-    /**
-     * \brief The position where the ray and object intersect.
-     *
-     * The Vector3 value that describes where the ray and object intersected.
-     */
-    Vec3 position{};
+    /** \brief Index in the scene's primitive space, or noPrimitive when nothing was hit. */
+    uint32_t primitive = noPrimitive;
 
-    /**
-     * \brief The normal of the scene object at the hit position.
-     *
-     * The Vector3 value that describes the surface normal of the scene object at the hit position.
-     */
-    Vec3 normal{};
+    static constexpr uint32_t noPrimitive = 0xFFFFFFFFu;
 
-    /**
-     * \brief Index of the material of the primitive that was hit.
-     *
-     * An index into the scene's material array rather than a name. Looking materials up
-     * by string meant a hash lookup and a string copy for every single intersection.
-     */
-    uint32_t materialIndex = 0;
-
-    /**
-     * \brief Index into the scene's emitter list, or -1 when this is not a sampled emitter.
-     *
-     * The integrator needs to know whether a surface's emission was already accounted for
-     * by direct light sampling, so that it is not counted a second time when a scattered
-     * ray happens to land on it.
-     */
-    int32_t emitterIndex = -1;
-
-    /**
-     * \brief True when the ray struck the outside of the surface.
-     *
-     * The normal is always flipped to face the ray, so it cannot be used to work out
-     * which side was hit. Refraction needs to know: a ray entering glass and a ray
-     * leaving it must use reciprocal indices, and the difference is invisible in the
-     * normal once it has been flipped.
-     */
-    bool frontFace = true;
-
-    /**
-     * \brief The texture coordinate at the hit position.
-     *
-     * Interpolated from the primitive's vertex texture coordinates. Only x and y are
-     * meaningful; z is unused and left at zero.
-     */
-    Vec3 textureCoord{};
-
-    /**
-     * \brief The ray that created the hit.
-     */
-    Ray ray;
-
-    /**
-     * \brief Creates a new Hit object.
-     *
-     * Creates a new Hit object where isHit is set to false. Time is set to INFINITY. All Vector3 parameters are set to
-     * (0, 0, 0) and materialName is set to an empty string.
-     */
-    Hit() : time(INFINITY)
+    auto isHit() const -> bool
     {
+        return primitive != noPrimitive;
     }
 };

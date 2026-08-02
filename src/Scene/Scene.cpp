@@ -7,7 +7,6 @@
 #include <stdexcept>
 using json = nlohmann::json;
 
-#include "Scene/SceneObject.h"
 #include "Utils/ObjModel.h"
 
 namespace
@@ -89,39 +88,6 @@ auto parseTransform(const json &object) -> Transform
 } // namespace
 
 /**
- * returns the list of scene object that are present in the scene
- *
- * \return - the vector of scene object pointers in the scene
- */
-auto Scene::getObjectList() -> const std::vector<std::shared_ptr<SceneObject>> &
-{
-    return m_ObjectList;
-}
-
-/**
- * adds a scene object to the scene
- *
- * \param sceneObject - the object to add
- * \param materialIndex - index of its material in the scene's material array
- */
-void Scene::addObject(std::shared_ptr<SceneObject> sceneObject, uint32_t materialIndex)
-{
-    sceneObject->setMaterialIndex(materialIndex);
-    m_ObjectList.push_back(sceneObject);
-}
-
-/**
- * adds multiple scene objects sharing one material
- */
-void Scene::addObjects(const std::vector<std::shared_ptr<SceneObject>> &sceneObjectList, uint32_t materialIndex)
-{
-    for (const std::shared_ptr<SceneObject> &sceneObject : sceneObjectList)
-    {
-        addObject(sceneObject, materialIndex);
-    }
-}
-
-/**
  * registers a material and returns the index used to refer to it
  */
 auto Scene::registerMaterial(const Material &material) -> uint32_t
@@ -157,14 +123,14 @@ auto Scene::materialIndexByName(const std::string &name) const -> uint32_t
  */
 void Scene::createAcceleratedStructure(unsigned int objectsInLeaf)
 {
-    if (m_ObjectList.size() <= 0)
+    if (m_Geometry.primitiveCount() == 0)
     {
         std::cout << "Scene has no objects in it!" << std::endl;
     }
     else
     {
         // Honour the configured leaf size, which was parsed and then ignored.
-        m_AcceleratedStructure = std::make_shared<BVH>(m_ObjectList, objectsInLeaf);
+        m_AcceleratedStructure = std::make_shared<BVH>(m_Geometry, objectsInLeaf);
     }
 }
 
@@ -299,61 +265,66 @@ Scene::Scene(std::string filePath)
             std::string path = resolveAssetPath(object.at("path"), sceneDir);
             ObjModel objModel(path);
 
-            std::vector<std::shared_ptr<SceneObject>> triangles = objModel.getSceneObjects();
-            for (const std::shared_ptr<SceneObject> &triangle : triangles)
-            {
-                triangle->applyTransform(transform);
-            }
-
-            addObjects(triangles, materialId);
+            // Placement is applied to the vertices this model contributed, once each,
+            // rather than to every triangle that refers to them.
+            const uint32_t firstVertex = m_Geometry.vertexCount();
+            objModel.appendTo(m_Geometry, materialId);
+            m_Geometry.transformVerticesFrom(firstVertex, transform);
         }
         else if (type == "triangle")
         {
-            Vec3 point0(object.at("point0").get<std::vector<float>>());
-            Vec3 point1(object.at("point1").get<std::vector<float>>());
-            Vec3 point2(object.at("point2").get<std::vector<float>>());
+            const Vec3 point0(object.at("point0").get<std::vector<float>>());
+            const Vec3 point1(object.at("point1").get<std::vector<float>>());
+            const Vec3 point2(object.at("point2").get<std::vector<float>>());
 
-            if (object.contains("normal0") && object.contains("normal1") && object.contains("normal2"))
-            {
-                Vec3 normal0(object.at("normal0").get<std::vector<float>>());
-                Vec3 normal1(object.at("normal1").get<std::vector<float>>());
-                Vec3 normal2(object.at("normal2").get<std::vector<float>>());
+            const bool hasNormals =
+                object.contains("normal0") && object.contains("normal1") && object.contains("normal2");
 
-                auto triangle = std::make_shared<Triangle>(point0, normal0, point1, normal1, point2, normal2);
-                triangle->applyTransform(transform);
-                addObject(triangle, materialId);
-            }
-            else
-            {
-                auto triangle = std::make_shared<Triangle>(point0, point1, point2);
-                triangle->applyTransform(transform);
-                addObject(triangle, materialId);
-            }
+            // A triangle written without vertex normals stores zero ones, and shading
+            // falls back to the plane it lies in.
+            const Vec3 normal0 = hasNormals ? Vec3(object.at("normal0").get<std::vector<float>>()) : Vec3();
+            const Vec3 normal1 = hasNormals ? Vec3(object.at("normal1").get<std::vector<float>>()) : Vec3();
+            const Vec3 normal2 = hasNormals ? Vec3(object.at("normal2").get<std::vector<float>>()) : Vec3();
+
+            const uint32_t firstVertex = m_Geometry.vertexCount();
+
+            const uint32_t vertex0 = m_Geometry.addVertex(point0, normal0, Vec3());
+            const uint32_t vertex1 = m_Geometry.addVertex(point1, normal1, Vec3());
+            const uint32_t vertex2 = m_Geometry.addVertex(point2, normal2, Vec3());
+
+            m_Geometry.transformVerticesFrom(firstVertex, transform);
+            m_Geometry.addTriangle(vertex0, vertex1, vertex2, materialId);
         }
         else if (type == "sphere")
         {
-            Vec3 center(object.at("center").get<std::vector<float>>());
-            float radius = object.at("radius");
+            const Vec3 center(object.at("center").get<std::vector<float>>());
+            const float radius = object.at("radius");
 
-            auto sphere = std::make_shared<Sphere>(center, radius);
-            sphere->applyTransform(transform);
+            // Placed here rather than by a later pass, so the emitter below is registered
+            // where the light actually ends up. A sphere has one radius and so cannot
+            // represent a non-uniform scale: the largest factor is used, and the mismatch
+            // reported rather than silently rendering something else.
+            if (transform.hasNonUniformScale())
+            {
+                std::cerr << "Sphere cannot be scaled non-uniformly; using the largest factor ("
+                          << transform.uniformScale() << ")" << std::endl;
+            }
 
-            // The emitter is registered from the sphere's final position, so a
-            // transformed light is sampled where it actually ends up.
-            center = sphere->getCenterPoint();
-            radius *= transform.uniformScale();
+            const bool placed = !transform.isIdentity();
+            const Vec3 finalCenter = placed ? transform.transformPoint(center) : center;
+            const float finalRadius = placed ? radius * transform.uniformScale() : radius;
+
+            const uint32_t sphereIndex = m_Geometry.addSphere(finalCenter, finalRadius, materialId);
 
             // An emissive sphere is an area light. Registering it lets direct lighting
             // sample it, which is what keeps small bright sources from being extremely
             // noisy.
             const Material &material = m_Materials[materialId];
-            if (material.isEmissive() && radius > 0.0f)
+            if (material.isEmissive() && finalRadius > 0.0f)
             {
-                sphere->setEmitterIndex(static_cast<int32_t>(m_Emitters.size()));
-                m_Emitters.push_back(Emitter{center, radius, material.emissive});
+                m_Geometry.setSphereEmitter(sphereIndex, static_cast<int32_t>(m_Emitters.size()));
+                m_Emitters.push_back(Emitter{finalCenter, finalRadius, material.emissive});
             }
-
-            addObject(sphere, materialId);
         }
     }
 
@@ -391,11 +362,9 @@ Scene::Scene(std::string filePath)
 
             const uint32_t materialIndex = registerMaterial(lightMaterial);
 
-            auto sphere = std::make_shared<Sphere>(pos, radius);
-            sphere->setEmitterIndex(static_cast<int32_t>(m_Emitters.size()));
+            const uint32_t sphereIndex = m_Geometry.addSphere(pos, radius, materialIndex);
+            m_Geometry.setSphereEmitter(sphereIndex, static_cast<int32_t>(m_Emitters.size()));
             m_Emitters.push_back(Emitter{pos, radius, emission});
-
-            addObject(sphere, materialIndex);
         }
     }
 }

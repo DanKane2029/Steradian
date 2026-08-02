@@ -71,8 +71,8 @@ auto Integrator::background(const Vec3 &direction) const -> Vec3
     return m_Scene->getAmbientLighting();
 }
 
-auto Integrator::sampleDirectLighting(const Hit &hit, const Material &material, const Vec3 &albedo, const Vec3 &viewDir,
-                                      Rng &rng) const -> Vec3
+auto Integrator::sampleDirectLighting(const Surface &surface, const Material &material, const Vec3 &albedo,
+                                      const Vec3 &viewDir, Rng &rng) const -> Vec3
 {
     // A mirror, or a smooth conductor, reflects exactly one direction. A point chosen on
     // a light almost never lies along it, so the contribution would be zero with
@@ -96,7 +96,7 @@ auto Integrator::sampleDirectLighting(const Hit &hit, const Material &material, 
     const Scene::Emitter &emitter = emitters[std::min(index, emitters.size() - 1)];
     const float selectionPdf = 1.0f / static_cast<float>(emitters.size());
 
-    const Vec3 toCenter = emitter.center - hit.position;
+    const Vec3 toCenter = emitter.center - surface.position;
     const float centerDistanceSquared = toCenter.lengthSquared();
     const float radiusSquared = emitter.radius * emitter.radius;
 
@@ -119,7 +119,7 @@ auto Integrator::sampleDirectLighting(const Hit &hit, const Material &material, 
     const Vec3 axis = toCenter / distanceToCenter;
     const Vec3 wi = Sampling::uniformCone(rng, cosThetaMax, axis);
 
-    const float nDotL = hit.normal.dot(wi);
+    const float nDotL = surface.normal.dot(wi);
     if (nDotL <= 0.0f)
     {
         return {};
@@ -140,7 +140,7 @@ auto Integrator::sampleDirectLighting(const Hit &hit, const Material &material, 
         return {};
     }
 
-    const Ray shadowRay(Ray::offsetOrigin(hit.position, hit.normal), wi, Ray::defaultEpsilon,
+    const Ray shadowRay(Ray::offsetOrigin(surface.position, surface.normal), wi, Ray::defaultEpsilon,
                         distance - (Ray::defaultEpsilon * 4.0f));
 
     Stats::countRay();
@@ -166,10 +166,10 @@ auto Integrator::sampleDirectLighting(const Hit &hit, const Material &material, 
 
         Vec3 t;
         Vec3 b;
-        Sampling::buildBasis(hit.normal, t, b);
+        Sampling::buildBasis(surface.normal, t, b);
 
-        const Vec3 woLocal = Vec3(viewDir.dot(t), viewDir.dot(b), viewDir.dot(hit.normal));
-        const Vec3 wiLocal = Vec3(wi.dot(t), wi.dot(b), wi.dot(hit.normal));
+        const Vec3 woLocal = Vec3(viewDir.dot(t), viewDir.dot(b), viewDir.dot(surface.normal));
+        const Vec3 wiLocal = Vec3(wi.dot(t), wi.dot(b), wi.dot(surface.normal));
 
         if (woLocal.z <= 0.0f)
         {
@@ -241,7 +241,7 @@ auto Integrator::radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) c
         Stats::countRay();
         const Hit hit = m_Scene->getAccelerationStructure()->intersect(ray);
 
-        if (!hit.isHit)
+        if (!hit.isHit())
         {
             radiance += throughput * background(ray.dir);
             break;
@@ -260,15 +260,19 @@ auto Integrator::radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) c
             }
         }
 
-        const Material &material = m_Scene->getMaterialByIndex(hit.materialIndex);
-        const Vec3 albedo = material.albedoAt(hit.textureCoord, hit.position);
+        // Position, normal and texture coordinate are worked out here, once, from the
+        // primitive that won. The intersection tests that lost never computed them.
+        const Surface surface = m_Scene->getGeometry().surfaceAt(ray, hit);
+
+        const Material &material = m_Scene->getMaterialByIndex(surface.materialIndex);
+        const Vec3 albedo = material.albedoAt(surface.textureCoord, surface.position);
 
         if (!recordedFirstHit)
         {
             // An emitter has no meaningful reflectance, so its emission stands in as the
             // colour a denoiser should preserve.
             outAlbedo = material.isEmissive() ? material.emissive : albedo;
-            outNormal = hit.normal;
+            outNormal = surface.normal;
             recordedFirstHit = true;
         }
 
@@ -282,9 +286,9 @@ auto Integrator::radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) c
             // the weights sum to one so the result stays unbiased.
             float weight = 1.0f;
 
-            if (!countEmission && hit.emitterIndex >= 0)
+            if (!countEmission && surface.emitterIndex >= 0)
             {
-                const float pdfLight = lightPdf(previousPosition, hit.emitterIndex);
+                const float pdfLight = lightPdf(previousPosition, surface.emitterIndex);
                 weight = misWeight(previousBsdfPdf, pdfLight);
             }
 
@@ -294,7 +298,7 @@ auto Integrator::radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) c
         // The view direction points back along the ray, away from the surface.
         const Vec3 viewDir = -ray.dir;
 
-        radiance += throughput * sampleDirectLighting(hit, material, albedo, viewDir, rng);
+        radiance += throughput * sampleDirectLighting(surface, material, albedo, viewDir, rng);
 
         // Choose the next direction, and update throughput by the scattering weight,
         // which is the BRDF times the cosine divided by the density it was sampled from.
@@ -306,7 +310,7 @@ auto Integrator::radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) c
         case Material::Type::Diffuse: {
             Vec3 t;
             Vec3 b;
-            Sampling::buildBasis(hit.normal, t, b);
+            Sampling::buildBasis(surface.normal, t, b);
 
             float pdf = 0.0f;
             const Vec3 local = Sampling::cosineHemisphere(rng, pdf);
@@ -316,7 +320,7 @@ auto Integrator::radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) c
                 return radiance;
             }
 
-            nextDirection = Sampling::toWorld(local, t, b, hit.normal);
+            nextDirection = Sampling::toWorld(local, t, b, surface.normal);
 
             // Cosine-weighted sampling makes the cosine and the density cancel, leaving
             // just the albedo. That cancellation is the reason for sampling this way.
@@ -324,7 +328,7 @@ auto Integrator::radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) c
 
             previousBsdfPdf = pdf;
             countEmission = false;
-            nextOrigin = Ray::offsetOrigin(hit.position, hit.normal);
+            nextOrigin = Ray::offsetOrigin(surface.position, surface.normal);
             break;
         }
 
@@ -333,9 +337,9 @@ auto Integrator::radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) c
             // sample and no density to weigh against anything.
             if (material.roughness < Microfacet::smoothThreshold)
             {
-                const Vec3 reflected = Sampling::reflect(ray.dir, hit.normal);
+                const Vec3 reflected = Sampling::reflect(ray.dir, surface.normal);
 
-                if (reflected.dot(hit.normal) <= 0.0f)
+                if (reflected.dot(surface.normal) <= 0.0f)
                 {
                     return radiance;
                 }
@@ -344,7 +348,7 @@ auto Integrator::radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) c
                 throughput *= albedo;
 
                 countEmission = true;
-                nextOrigin = Ray::offsetOrigin(hit.position, hit.normal);
+                nextOrigin = Ray::offsetOrigin(surface.position, surface.normal);
                 break;
             }
 
@@ -352,11 +356,11 @@ auto Integrator::radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) c
 
             Vec3 t;
             Vec3 b;
-            Sampling::buildBasis(hit.normal, t, b);
+            Sampling::buildBasis(surface.normal, t, b);
 
             // Work in the local frame, where the surface normal is +Z and the
             // distribution is expressed most simply.
-            const Vec3 woLocal = Vec3(-ray.dir.dot(t), -ray.dir.dot(b), -ray.dir.dot(hit.normal));
+            const Vec3 woLocal = Vec3(-ray.dir.dot(t), -ray.dir.dot(b), -ray.dir.dot(surface.normal));
 
             if (woLocal.z <= 0.0f)
             {
@@ -399,13 +403,13 @@ auto Integrator::radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) c
 
             throughput *= fresnel * weight * compensation;
 
-            nextDirection = Sampling::toWorld(wiLocal, t, b, hit.normal);
+            nextDirection = Sampling::toWorld(wiLocal, t, b, surface.normal);
             previousBsdfPdf = Microfacet::pdf(woLocal, wiLocal, alpha);
 
             // A rough surface has a real density, so emission it scatters into can be
             // weighed against direct light sampling rather than being taken whole.
             countEmission = false;
-            nextOrigin = Ray::offsetOrigin(hit.position, hit.normal);
+            nextOrigin = Ray::offsetOrigin(surface.position, surface.normal);
             break;
         }
 
@@ -417,12 +421,12 @@ auto Integrator::radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) c
             // interaction was therefore treated as entering the glass, so rays inside it
             // bent the wrong way trying to leave, never escaped, and a glass sphere
             // rendered as a solid ball.
-            const float eta = hit.frontFace ? (1.0f / material.ior) : material.ior;
+            const float eta = surface.frontFace ? (1.0f / material.ior) : material.ior;
 
-            const float cosIncident = std::min(-ray.dir.dot(hit.normal), 1.0f);
+            const float cosIncident = std::min(-ray.dir.dot(surface.normal), 1.0f);
 
             Vec3 refracted;
-            const bool canRefract = Sampling::refract(ray.dir, hit.normal, eta, refracted);
+            const bool canRefract = Sampling::refract(ray.dir, surface.normal, eta, refracted);
 
             // Schlick's approximation is stated from the less dense side, so a ray on its
             // way out of the glass has to be evaluated with the angle it will leave at
@@ -430,7 +434,7 @@ auto Integrator::radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) c
             // understates reflection at grazing angles, which is where a glass surface
             // becomes most mirror-like.
             const float cosForFresnel =
-                (canRefract && !hit.frontFace) ? std::fabs(refracted.dot(hit.normal)) : cosIncident;
+                (canRefract && !surface.frontFace) ? std::fabs(refracted.dot(surface.normal)) : cosIncident;
 
             const float r0raw = (1.0f - material.ior) / (1.0f + material.ior);
             const float reflectance = Sampling::fresnelSchlick(cosForFresnel, r0raw * r0raw);
@@ -440,17 +444,17 @@ auto Integrator::radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) c
             // Total internal reflection leaves no choice to make.
             if (!canRefract || rng.nextFloat() < reflectance)
             {
-                nextDirection = Sampling::reflect(ray.dir, hit.normal);
-                nextOrigin = Ray::offsetOrigin(hit.position, hit.normal);
+                nextDirection = Sampling::reflect(ray.dir, surface.normal);
+                nextOrigin = Ray::offsetOrigin(surface.position, surface.normal);
             }
             else
             {
                 nextDirection = refracted;
-                nextOrigin = Ray::offsetOrigin(hit.position, -hit.normal);
+                nextOrigin = Ray::offsetOrigin(surface.position, -surface.normal);
 
                 // Refracting is the only way to cross the boundary, so this is where the
                 // path enters or leaves the interior.
-                interior = hit.frontFace ? &material : nullptr;
+                interior = surface.frontFace ? &material : nullptr;
             }
 
             throughput *= albedo;
@@ -476,7 +480,7 @@ auto Integrator::radiance(Ray ray, Rng &rng, Vec3 &outAlbedo, Vec3 &outNormal) c
             throughput /= survival;
         }
 
-        previousPosition = hit.position;
+        previousPosition = surface.position;
 
         ray = Ray(nextOrigin, nextDirection);
     }
