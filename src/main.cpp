@@ -108,6 +108,32 @@ void printUsage(const char *program)
 }
 
 /**
+ * \brief What to say when a GPU was asked of a build that has none.
+ *
+ * The likeliest cause is named first, and it is not the one this message used to give.
+ * Each configuration builds into its own directory, so a tree that has been built both
+ * ways has a GPU binary and a CPU one sitting side by side, and running the wrong one
+ * produces exactly this. Being told to fetch dependencies you already have, and to set an
+ * option you already set, is a poor way to find that out.
+ */
+auto noGpuSupportMessage() -> std::string
+{
+    return "This build has no GPU support.\n"
+           "\n"
+           "If you have already built with --gpu, check which binary you are running:\n"
+           "each configuration builds into its own directory, and the GPU one is\n"
+           "\n"
+           "    ./build-gpu/src/steradian\n"
+           "\n"
+           "Otherwise, build it with\n"
+           "\n"
+           "    scripts/build.sh --gpu\n"
+           "\n"
+           "which fetches the CUDA and OptiX headers if they are missing. Configuring by\n"
+           "hand instead, pass -DPT_ENABLE_GPU=ON and watch for 'steradian: gpu = ON'.\n";
+}
+
+/**
  * reads the value that follows a flag, reporting a clear error if it is missing
  */
 auto takeValue(int argc, char *argv[], int &i, const char *flag) -> std::string
@@ -342,12 +368,21 @@ auto main(int argc, char *argv[]) -> int
 #ifdef PT_HAVE_GPU
             return Gpu::printDeviceInfo() ? EXIT_SUCCESS : EXIT_FAILURE;
 #else
-            std::cerr << "This build has no GPU support.\n"
-                      << "Fetch the headers with scripts/setup-gpu-deps.sh, then configure\n"
-                      << "with -DPT_ENABLE_GPU=ON.\n";
+            std::cerr << noGpuSupportMessage();
             return EXIT_FAILURE;
 #endif
         }
+
+#ifndef PT_HAVE_GPU
+        // Before the scene is read, not after. Loading a model and building a hierarchy
+        // only to refuse the render wastes the time and buries the message under the
+        // output of work that was never going to be used.
+        if (options.useGpu)
+        {
+            std::cerr << noGpuSupportMessage();
+            return EXIT_FAILURE;
+        }
+#endif
 
         if (options.configPath.empty() || options.scenePath.empty())
         {
@@ -385,23 +420,15 @@ auto main(int argc, char *argv[]) -> int
             RayTracer rayTracer(&pixelBuffer, &scene, config);
             rayTracer.setAdaptiveTolerance(options.adaptiveTolerance);
 
-            if (options.useGpu)
+#ifdef PT_HAVE_GPU
+            if (options.useGpu && options.adaptiveTolerance > 0.0f)
             {
-#ifndef PT_HAVE_GPU
-                std::cerr << "This build has no GPU support.\n"
-                          << "Fetch the headers with scripts/setup-gpu-deps.sh, then configure\n"
-                          << "with -DPT_ENABLE_GPU=ON.\n";
-                return EXIT_FAILURE;
-#else
-                if (options.adaptiveTolerance > 0.0f)
-                {
-                    // Said rather than ignored. Adaptive sampling is per pixel and ports
-                    // naturally, but it is not written yet, and silently rendering
-                    // something other than what was asked for is worse than saying so.
-                    std::cerr << "Note: --adaptive is not implemented on the GPU and is being ignored.\n";
-                }
-#endif
+                // Said rather than ignored. Adaptive sampling is per pixel and ports
+                // naturally, but it is not written yet, and silently rendering something
+                // other than what was asked for is worse than saying so.
+                std::cerr << "Note: --adaptive is not implemented on the GPU and is being ignored.\n";
             }
+#endif
 
             std::cout << "Rendering " << config.windowWidth << "x" << config.windowHeight << " at "
                       << options.samplesPerPixel << " spp on "
