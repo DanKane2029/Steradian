@@ -30,6 +30,7 @@ CMake at them so those arguments do not have to be remembered.
 | `scripts/build.sh --clean --test` | ...from scratch |
 | `scripts/build.sh --debug` | a debug build |
 | `scripts/build.sh --no-viewer` | headless only |
+| `scripts/build.sh --gpu` | with GPU support, fetching its dependencies if needed |
 
 Each configuration builds into its own directory, so switching between release and debug
 does not force a rebuild each time.
@@ -69,6 +70,40 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_LIBRARY_PATH="$HOME/.local/sysroot/usr/lib/x86_64-linux-gnu"
 ```
 
+### GPU support
+
+**Nothing renders on the GPU yet.** What exists today is the toolchain and the plumbing:
+a build option, and a `--gpu-info` command that reports whether this machine can actually
+run the backend being built. The renderer itself is unchanged, and a build without
+`PT_ENABLE_GPU` is byte-for-byte the same as one from before any of it existed.
+
+```sh
+scripts/build.sh --gpu
+./build-gpu/src/steradian --gpu-info
+```
+
+Most of what a GPU path needs is already present on any machine with an NVIDIA driver.
+`libcuda.so.1` and OptiX itself, `libnvoptix.so.1`, both ship *with the display driver*
+rather than with an SDK, so there is no CUDA toolkit to install. What is missing is only
+the headers to compile against plus NVRTC, and `scripts/setup-gpu-deps.sh` fetches those
+without root: about 31 MB from NVIDIA's redistributable archives and the public OptiX
+headers from GitHub. They land in `third_party/gpu/` and are not checked in.
+
+One consequence worth knowing before turning it on: a binary built with `PT_ENABLE_GPU=ON`
+links `libcuda.so.1` and will not start at all on a machine without an NVIDIA driver, even
+to render on the CPU. That is why the option is off by default, and why the ordinary
+build, the tests and CI never touch any of it.
+
+There is deliberately no `nvcc`. Device code is compiled from source at run time by
+NVRTC, which is how OptiX is normally driven, and which sidesteps a real conflict here:
+the CUDA 12.0 `nvcc` supports GCC up to 12, and this project builds with GCC 13.
+
+On the machine this was developed on, `--gpu-info` reports an RTX 3060 Ti with 58,368
+resident threads and **RT core version 20** — the fixed-function ray/box intersection
+hardware. That last number is the one that matters: the dragon spends 658 bounding box
+visits per ray against 87.5 triangle tests, so traversal is the cost, and traversal is
+exactly what that silicon does.
+
 ### Build options
 
 | Option | Default | Meaning |
@@ -76,6 +111,7 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release \
 | `PT_BUILD_VIEWER` | `ON` | Build the interactive viewer |
 | `PT_BUILD_TESTS` | `ON` | Build the test suite |
 | `PT_ENABLE_STATS` | `ON` | Collect ray, node and primitive counters |
+| `PT_ENABLE_GPU` | `OFF` | Build against the CUDA driver API and OptiX. See below |
 | `PT_NATIVE_ARCH` | `OFF` | Compile with `-march=native`. Off by default because it changes floating point results between machines, which would make the reference images non-portable |
 
 ---
@@ -113,6 +149,7 @@ watch; pass `--out` and it renders once to a file.
 | `--denoise [n]` | Filter noise using surface colour and normals as a guide (default 5 passes). Applies to both saved images and the viewer |
 | `--denoise-strength <v>` | How much radiance difference the filter blurs across (default 0.10) |
 | `--headless` | Render once and exit without opening a window |
+| `--gpu-info` | Report the GPU, OptiX and NVRTC this build can see, then exit |
 | `--help` | Full usage, including the viewer controls |
 
 `--samples` is the dial that matters. Cost is linear in it and noise falls as its square

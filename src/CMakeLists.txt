@@ -36,6 +36,33 @@ endif()
 add_executable(steradian main.cpp)
 target_link_libraries(steradian PRIVATE pt_core pt_warnings)
 
+if(PT_GPU_ENABLED)
+    # Kept out of pt_core deliberately. The renderer core, and therefore every test,
+    # must not acquire a dependency on the GPU SDK; only the executable links this.
+    add_library(pt_gpu STATIC Gpu/DeviceInfo.cpp)
+
+    target_include_directories(pt_gpu PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${PT_GPU_SDK_DIR}/include)
+
+    # libcuda is linked through the stub rather than the installed driver. The stub
+    # exports the same entry points under the same soname, so the loader binds to the
+    # real driver at run time -- which is also what makes it possible to build this on a
+    # machine that has the headers but no NVIDIA driver at all.
+    target_link_libraries(pt_gpu
+        PUBLIC ${PT_GPU_SDK_DIR}/lib/stubs/libcuda.so
+               ${PT_GPU_SDK_DIR}/lib/libnvrtc.so
+               ${CMAKE_DL_LIBS}
+        PRIVATE pt_warnings
+    )
+
+    # NVRTC is not installed system-wide, so the executable has to be told where the copy
+    # fetched by setup-gpu-deps.sh lives. OptiX needs no such entry: optix_stubs.h opens
+    # libnvoptix.so.1 by name at run time, and the driver put that on the default path.
+    set_target_properties(steradian PROPERTIES BUILD_RPATH "${PT_GPU_SDK_DIR}/lib")
+
+    target_link_libraries(steradian PRIVATE pt_gpu)
+    target_compile_definitions(steradian PRIVATE PT_HAVE_GPU)
+endif()
+
 if(PT_VIEWER_ENABLED)
     add_library(pt_viewer STATIC
         Window/CameraController.cpp

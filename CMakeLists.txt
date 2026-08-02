@@ -31,6 +31,16 @@ option(PT_ENABLE_STATS "Collect render statistics" ON)
 
 option(PT_BUILD_TESTS "Build the golden-image regression tests" ON)
 
+# GPU support: the CUDA driver API and OptiX. Off by default and deliberately so -- the
+# CPU renderer, the tests and CI must be unaffected by any of this, and a build with it
+# off has to stay byte-identical to one from before it existed.
+#
+# The headers are not vendored in the repository; run scripts/setup-gpu-deps.sh, which
+# fetches them without root into the directory below.
+option(PT_ENABLE_GPU "Build GPU support (CUDA driver API and OptiX)" OFF)
+set(PT_GPU_SDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/gpu"
+    CACHE PATH "Where setup-gpu-deps.sh put the CUDA and OptiX headers")
+
 # Common warning flags, applied privately so third-party code is unaffected.
 add_library(pt_warnings INTERFACE)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -64,6 +74,23 @@ if(PT_BUILD_VIEWER)
     endif()
 endif()
 
+# As with the viewer, a missing dependency downgrades to a build without the feature and
+# says why, rather than failing the configure outright.
+set(PT_GPU_ENABLED OFF)
+if(PT_ENABLE_GPU)
+    if(NOT EXISTS "${PT_GPU_SDK_DIR}/include/cuda.h")
+        message(WARNING
+            "PT_ENABLE_GPU is ON but ${PT_GPU_SDK_DIR}/include/cuda.h is missing. "
+            "Run: scripts/setup-gpu-deps.sh. Building without GPU support.")
+    elseif(NOT EXISTS "${PT_GPU_SDK_DIR}/include/optix.h")
+        message(WARNING
+            "PT_ENABLE_GPU is ON but the OptiX headers are missing from ${PT_GPU_SDK_DIR}. "
+            "Run: scripts/setup-gpu-deps.sh. Building without GPU support.")
+    else()
+        set(PT_GPU_ENABLED ON)
+    endif()
+endif()
+
 add_subdirectory(src)
 
 if(PT_BUILD_TESTS)
@@ -76,3 +103,4 @@ message(STATUS "steradian: viewer      = ${PT_VIEWER_ENABLED}")
 message(STATUS "steradian: native arch = ${PT_NATIVE_ARCH}")
 message(STATUS "steradian: stats       = ${PT_ENABLE_STATS}")
 message(STATUS "steradian: tests       = ${PT_BUILD_TESTS}")
+message(STATUS "steradian: gpu         = ${PT_GPU_ENABLED}")
