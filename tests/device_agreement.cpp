@@ -118,8 +118,11 @@ auto main(int argc, char *argv[]) -> int
     std::vector<Vec3> unusedAlbedo;
     std::vector<Vec3> unusedNormal;
 
-    if (!tracer->render(width, height, samples, 1, maxDepth, gpuOne, unusedAlbedo, unusedNormal) ||
-        !tracer->render(width, height, samples, 2, maxDepth, gpuTwo, unusedAlbedo, unusedNormal))
+    // restart between them: these are two independent images, not one refined twice.
+    if (!tracer->render(scene.getCamera(), width, height, samples, 1, maxDepth, true, gpuOne, unusedAlbedo,
+                        unusedNormal) ||
+        !tracer->render(scene.getCamera(), width, height, samples, 2, maxDepth, true, gpuTwo, unusedAlbedo,
+                        unusedNormal))
     {
         std::fprintf(stderr, "the GPU render failed\n");
         return 1;

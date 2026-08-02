@@ -64,7 +64,8 @@ auto measureOnGpu(const Scene &scene, int samples) -> float
     std::vector<Vec3> albedo;
     std::vector<Vec3> normal;
 
-    if (!tracer->render(size, size, static_cast<unsigned int>(samples), 99, 12, colour, albedo, normal))
+    if (!tracer->render(scene.getCamera(), size, size, static_cast<unsigned int>(samples), 99, 12, true, colour, albedo,
+                        normal))
     {
         std::fprintf(stderr, "the GPU render failed\n");
         return -1.0f;

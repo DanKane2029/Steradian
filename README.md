@@ -89,18 +89,22 @@ At 400x320 and 64 samples per pixel, against eight CPU threads:
 
 | Scene | CPU | GPU | |
 |---|---|---|---|
-| `cornell_box` | 0.80 s | 0.166 s | 4.8x |
-| `dragon` | 19.70 s | 0.158 s | **125x** |
-| `glass_dragon` | 35.83 s | 0.135 s | **265x** |
-| `bunny` | 30.98 s | 0.114 s | **271x** |
+| `cornell_box` | 0.77 s | 0.044 s | 18x |
+| `dragon` | 21.64 s | 0.036 s | **605x** |
+| `glass_dragon` | 34.93 s | 0.047 s | **742x** |
+| `bunny` | 30.09 s | 0.033 s | **915x** |
 
-The Cornell box gains least, and that is the honest shape of the result rather than a
-disappointment: it is a ten-triangle scene, so about sixty milliseconds of fixed launch
-cost is most of its render. Give it more work and the ratio grows — the dragon at 256
-samples takes 81.4 s on the CPU and 0.23 s on the GPU, which is **352x**. Setup, about
-0.75 s to compile the device code and build the acceleration structure, is timed and
-reported separately, because folding it in made every scene look like it took the same
-nine tenths of a second.
+The Cornell box gains least, which is the shape of the result rather than a
+disappointment: it is a ten-triangle scene that the CPU already renders in under a second,
+so there is little there to win.
+
+Two costs are deliberately kept out of those figures and reported separately, because
+neither is rendering and both are larger than the render. **Setup** — compiling the device
+code and building the acceleration structure — is about 0.9 s, paid once. **Teardown** of
+the CUDA context is about 85 milliseconds, which is more than twice a whole frame. An
+earlier version of this table was measured with a wall clock either side of the call and
+so quietly included both; the numbers it gave were between four and thirty times too
+pessimistic.
 
 Most of what a GPU path needs is already present on any machine with an NVIDIA driver.
 `libcuda.so.1` and OptiX itself, `libnvoptix.so.1`, both ship *with the display driver*
@@ -123,6 +127,29 @@ resident threads and **RT core version 20** — the fixed-function ray/box inter
 hardware. That last number is the one that matters: the dragon spends 658 bounding box
 visits per ray against 87.5 triangle tests, so traversal is the cost, and traversal is
 exactly what that silicon does.
+
+#### The viewer
+
+`--device gpu` drives the interactive viewer as well as a headless render, which is where
+the speed stops being a number in a table and becomes something you can feel. On
+`glass_dragon` at 1000x800, with the camera left still for fourteen seconds:
+
+| | samples reached | frame rate |
+|---|---|---|
+| CPU, 8 threads | 2 | 0.2 fps |
+| GPU | **2,655** | 3.4 fps |
+
+The renderer decides how many samples to take per frame rather than fixing it at one,
+because a moving camera and a still one want opposite things. While the camera moves every
+sample is about to be discarded and only responsiveness matters, so it drops to a single
+sample — 19 ms for a 1000x800 frame. While it is still, nobody is waiting on input, so
+frames are allowed to grow until the picture settles quickly, bounded so that moving again
+is noticed promptly.
+
+Worth knowing where the remaining time goes: at one sample per frame the render is 19 ms
+and the display path — tone mapping 800,000 pixels on the CPU and uploading them — is most
+of the rest. The GPU is no longer the limit at that end, which is what makes CUDA/OpenGL
+interop the obvious next thing to try rather than something to have done up front.
 
 #### Being sure it is right before being pleased it is fast
 
