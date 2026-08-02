@@ -8,7 +8,7 @@
 
 #include "Utils/StringUtils.h"
 
-ObjModel::ObjModel(std::string filePath) : material(Material("obj_material"))
+ObjModel::ObjModel(std::string filePath)
 {
     loadModel(filePath);
 }

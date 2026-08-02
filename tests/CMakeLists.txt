@@ -73,6 +73,12 @@ set(GOLDEN_SCENES
     test_man_obj
     cornell_box
     glossy_spheres
+    # Two spheres sharing one image texture, tinted differently by their own albedos.
+    # Textures had no coverage at all until this scene: nothing else in res/scenes
+    # references an image, so every change to texture loading, sampling or lookup was
+    # unguarded. Sharing one file between two materials is deliberate -- the scene loads
+    # each image once and refers to it by index, and that sharing is what this pins.
+    textured_spheres
     # A glass sphere in front of red, green and blue spheres. Through it the order is
     # reversed, which is what a lens does and what nothing else in the scene can fake, so
     # the reference image pins refraction down rather than merely exercising it.

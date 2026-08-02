@@ -8,6 +8,7 @@
 #include "Geometry.h"
 #include "Material.h"
 #include "RayTracer/Camera.h"
+#include "Texture.h"
 
 /**
  * a collection of primitive scene objects, lights, and materials
@@ -56,6 +57,11 @@ class Scene
     std::vector<Material> m_Materials{};
     std::unordered_map<std::string, uint32_t> m_MaterialIndices{};
 
+    // Textures are owned here rather than by the materials that use them, so a material
+    // stays a plain block of numbers. Two materials naming the same file share one.
+    std::vector<Texture> m_Textures{};
+    std::unordered_map<std::string, int32_t> m_TextureIndices{};
+
     std::vector<Emitter> m_Emitters{};
 
     std::shared_ptr<BVH> m_AcceleratedStructure{};
@@ -68,8 +74,37 @@ class Scene
         return m_Geometry;
     }
 
-    /** registers a material and returns the index it can be referenced by */
-    auto registerMaterial(const Material &material) -> uint32_t;
+    /**
+     * \brief Registers a material and returns the index it can be referenced by.
+     *
+     * The name is kept here rather than on the material itself; nothing looks a material
+     * up by string once rendering starts.
+     */
+    auto registerMaterial(const Material &material, const std::string &name) -> uint32_t;
+
+    /** loads a texture, or returns the index of one already loaded from the same file */
+    auto registerTexture(const std::string &path) -> int32_t;
+
+    /**
+     * \brief The surface colour of a material at a point, texture included.
+     *
+     * Lives here because the textures do. The material contributes the flat colour or
+     * the procedural checker; this applies the image on top of it.
+     *
+     * \param texCoord Surface texture coordinates; only x and y are used.
+     * \param position Where the point is in the world, for the procedural checker.
+     */
+    auto albedoAt(const Material &material, const Vec3 &texCoord, const Vec3 &position) const -> Vec3
+    {
+        const Vec3 base = material.baseAlbedo(position);
+
+        if (material.textureIndex < 0)
+        {
+            return base;
+        }
+
+        return base * m_Textures[static_cast<size_t>(material.textureIndex)].getTexel(texCoord.x, texCoord.y);
+    }
 
     /** looks a material index up by name; load-time only */
     auto materialIndexByName(const std::string &name) const -> uint32_t;
