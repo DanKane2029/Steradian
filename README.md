@@ -350,6 +350,14 @@ Stanford models; everything else finishes in around three. A GPU build adds sixt
 more, covering the shared maths, the traversal, the furnace invariant on the device, and
 cross-backend agreement.
 
+Formatting is checked by the same script continuous integration runs, so the two cannot
+disagree about which files are covered:
+
+```sh
+scripts/format.sh              # format in place
+scripts/format.sh --check      # report and change nothing, as CI does
+```
+
 ---
 
 ## What it does
