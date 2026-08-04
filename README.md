@@ -283,6 +283,9 @@ watch; pass `--out` and it renders once to a file.
 `res/configs/test_config.json` renders at 1000x800. For quick experiments use
 `tests/test_config.json` instead, which is 160x120 and about forty times faster.
 
+Renders worth keeping go in `renders/`, which is not committed — see the note there for
+why, and for what actually improves a picture once the obvious knob stops working.
+
 ### Options
 
 | Flag | Meaning |
@@ -565,6 +568,18 @@ red leaves the blue green cast of thick window glass.
 ### Checkered surfaces
 
 ![A glass dragon over a checkered floor](docs/glass_dragon.png)
+
+1280x1024 at 32,000 samples per pixel: 3.5 minutes on the GPU, and around twelve hours on
+eight CPU threads. Rendered at the size shown rather than scaled down from something
+larger, because at these speeds the renderer is the better resampler.
+
+The glitter is not noise, which is worth saying because it looks exactly like it. Sampling
+harder does not remove it — the error is already around 0.3% of range by sixteen thousand
+samples — and neither does allowing deeper paths, since 8, 24 and 64 bounces give an
+indistinguishable picture. It is the checkered floor folded and scattered through a lumpy
+refracting surface: real high-frequency structure, which *resolves* as pixels are added
+rather than smoothing away as samples are. A 3840x3072 version renders in 37 minutes and
+makes that obvious; see `renders/` for how to make one.
 
 A checker is the traditional thing to put under a glass object, and for a reason worth
 stating: it is a pattern whose correct appearance is known in advance. Straight lines stay
