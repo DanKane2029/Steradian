@@ -766,11 +766,19 @@ The config file is separate because it describes the render rather than the scen
 | `src/Window/` | Pixel buffer, and the optional viewer and camera controls |
 | `tests/` | Reference images and the checks described above |
 | `res/` | Scenes, configs and models. See `res/models/ATTRIBUTION.md` |
-| `docs/` | Images used by this page |
+| `docs/` | Images used by this page, and `future-work.md` |
+| `renders/` | Somewhere to put renders worth keeping. Not committed |
 
 `RayTracer`, `Scene` and `Utils` include each other cyclically and build as a single
 library. Only the viewer depends on GLFW and OpenGL, which is what keeps headless builds,
 and therefore continuous integration, possible.
+
+## What is left
+
+[`docs/future-work.md`](docs/future-work.md) lists what remains, ordered by how much
+evidence stands behind it rather than by how interesting it is. The item with an actual
+measurement behind it is CUDA/OpenGL interop for the viewer: the GPU is no longer the
+limiting factor there, the host-side tone map and upload are.
 
 ---
 
