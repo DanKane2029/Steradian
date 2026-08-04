@@ -124,11 +124,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Through the same script contributors run, so the two cannot disagree about
+      # which files are covered. They did once: the script walked src/ and this walked
+      # src/ and tests/, which let a correctly formatted checkout fail here.
       - name: Check formatting
-        run: |
-          # Vendored stb headers are excluded; they are not ours to reformat.
-          # .cu is included: device code is source like any other, and it is the part
-          # no compiler in this workflow parses, so nothing else would notice it drifting.
-          files=$(find src tests \( -name '*.h' -o -name '*.cpp' -o -name '*.cu' \) \
-            | grep -v 'stb_image.h' | grep -v 'stb_image_write.h')
-          clang-format --dry-run --Werror $files
+        run: scripts/format.sh --check

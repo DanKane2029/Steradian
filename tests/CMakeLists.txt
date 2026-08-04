@@ -198,4 +198,19 @@ if(PT_GPU_ENABLED)
             COMMAND device_agreement ${CMAKE_SOURCE_DIR}/res/scenes/${scene}.json 256)
         set_tests_properties(device.agreement.${scene} PROPERTIES TIMEOUT 600)
     endforeach()
+
+    # The property every other GPU check leans on: the same seed must give the same
+    # bytes. Asserted directly, because a regression here would otherwise surface in the
+    # furnace and agreement tests as a slightly wrong number rather than as what it is.
+    add_test(NAME device.determinism
+        COMMAND ${CMAKE_COMMAND}
+            -DRENDERER=$<TARGET_FILE:steradian>
+            -DCOMPARE=$<TARGET_FILE:image_compare>
+            -DCONFIG=${CMAKE_CURRENT_SOURCE_DIR}/test_config.json
+            -DSCENE_DIR=${CMAKE_SOURCE_DIR}/res/scenes
+            "-DSCENES=cornell_box;glass_dragon"
+            -DOUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/run_device_determinism_test.cmake
+    )
+    set_tests_properties(device.determinism PROPERTIES TIMEOUT 600)
 endif()
