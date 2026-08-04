@@ -573,13 +573,10 @@ red leaves the blue green cast of thick window glass.
 eight CPU threads. Rendered at the size shown rather than scaled down from something
 larger, because at these speeds the renderer is the better resampler.
 
-The glitter is not noise, which is worth saying because it looks exactly like it. Sampling
-harder does not remove it — the error is already around 0.3% of range by sixteen thousand
-samples — and neither does allowing deeper paths, since 8, 24 and 64 bounces give an
-indistinguishable picture. It is the checkered floor folded and scattered through a lumpy
-refracting surface: real high-frequency structure, which *resolves* as pixels are added
-rather than smoothing away as samples are. A 3840x3072 version renders in 37 minutes and
-makes that obvious; see `renders/` for how to make one.
+Sampling harder stops helping sooner than expected: the error is already around 0.3% of
+range by sixteen thousand samples, and deeper paths change nothing either, 8, 24 and 64
+bounces being indistinguishable. Resolution is where the remaining time goes. A 3840x3072
+version renders in 37 minutes; see `renders/` for how to make one.
 
 A checker is the traditional thing to put under a glass object, and for a reason worth
 stating: it is a pattern whose correct appearance is known in advance. Straight lines stay

@@ -34,10 +34,8 @@ independent reference at a different seed, the mean channel difference out of 25
 than the ideal halving per quadrupling, because the reference carries its own noise. By
 sixteen thousand the error is around 0.3% of range and further sampling is invisible.
 
-Resolution is where the time goes instead. The sparkle in that scene is not noise at all:
-it is the checkered floor refracted through a lumpy surface, and it resolves into fine
-detail as pixels are added rather than smoothing away as samples are added. Path depth is
-not involved either, 8, 24 and 64 bounces being indistinguishable.
+Resolution is where the time goes instead. Path depth is not involved either, 8, 24 and 64
+bounces being indistinguishable.
 
 For scale, 3840x3072 at 32,000 samples is 377 G samples: 37 minutes on an RTX 3060 Ti, and
 about nine days on eight CPU threads.
