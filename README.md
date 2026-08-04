@@ -578,6 +578,13 @@ range by sixteen thousand samples, and deeper paths change nothing either, 8, 24
 bounces being indistinguishable. Resolution is where the remaining time goes. A 3840x3072
 version renders in 37 minutes; see `renders/` for how to make one.
 
+The caustics are continuous because the surface is. Vertex normals are interpolated across
+each triangle from its barycentric coordinates, so a mesh shades as the smooth surface it
+approximates rather than as the flat facets it is made of. Refraction is unforgiving about
+this in a way diffuse shading is not: a facet edge deflects a transmitted ray by a visible
+angle, so a faceted glass model does not merely look a little blocky, it scatters light
+into a harsh glitter that is easy to mistake for noise.
+
 A checker is the traditional thing to put under a glass object, and for a reason worth
 stating: it is a pattern whose correct appearance is known in advance. Straight lines stay
 straight, squares stay square, and the whole thing runs to a vanishing point. Anything that

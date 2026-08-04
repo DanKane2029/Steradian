@@ -119,7 +119,10 @@ auto ObjModel::parseFace(std::vector<std::string> &faceIndices) -> std::vector<O
     for (std::string s : faceIndices)
     {
         // parse out vertex index, texture coord, & vertex normal
-        std::vector<std::string> faceIndexSplit = splitString(s, std::string("/"));
+        // Empty fields are kept: in "2//2" the gap is what says the corner has a normal
+        // and no texture coordinate. Dropping it makes the normal index look like a
+        // texture index, and the model silently loses every vertex normal it had.
+        std::vector<std::string> faceIndexSplit = splitString(s, std::string("/"), true);
 
         // face index
         FaceIndices face;
