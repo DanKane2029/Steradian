@@ -283,6 +283,9 @@ watch; pass `--out` and it renders once to a file.
 `res/configs/test_config.json` renders at 1000x800. For quick experiments use
 `tests/test_config.json` instead, which is 160x120 and about forty times faster.
 
+Renders worth keeping go in `renders/`, which is not committed — see the note there for
+why, and for what actually improves a picture once the obvious knob stops working.
+
 ### Options
 
 | Flag | Meaning |
@@ -565,6 +568,15 @@ red leaves the blue green cast of thick window glass.
 ### Checkered surfaces
 
 ![A glass dragon over a checkered floor](docs/glass_dragon.png)
+
+1280x1024 at 32,000 samples per pixel: 3.5 minutes on the GPU, and around twelve hours on
+eight CPU threads. Rendered at the size shown rather than scaled down from something
+larger, because at these speeds the renderer is the better resampler.
+
+Sampling harder stops helping sooner than expected: the error is already around 0.3% of
+range by sixteen thousand samples, and deeper paths change nothing either, 8, 24 and 64
+bounces being indistinguishable. Resolution is where the remaining time goes. A 3840x3072
+version renders in 37 minutes; see `renders/` for how to make one.
 
 A checker is the traditional thing to put under a glass object, and for a reason worth
 stating: it is a pattern whose correct appearance is known in advance. Straight lines stay
